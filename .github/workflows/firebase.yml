@@ -26,7 +26,15 @@ jobs:
         working-directory: functions
       - name: Publicar reglas de seguridad y servidor
         if: steps.cred.outputs.ok == 'true'
-        run: npx --yes firebase-tools@15.30.0 deploy --only firestore:rules,functions --project mantenimiento-la-josefina --non-interactive --force
+        run: |
+          for i in 1 2 3; do
+            if npx --yes firebase-tools@15.30.0 deploy --only firestore:rules,functions --project mantenimiento-la-josefina --non-interactive --force > salida.txt 2>&1; then cat salida.txt; exit 0; fi
+            cat salida.txt
+            echo "Intento $i falló, esperando 90 segundos"
+            sleep 90
+          done
+          grep -iE "error|denied|permission|enable|billing|propagat|failed" salida.txt | tail -15 | while IFS= read -r l; do echo "::error::$l"; done
+          exit 1
       - name: Bloquear registro libre de cuentas
         if: steps.cred.outputs.ok == 'true' && hashFiles('herramientas/bloquear-registro.activo') != ''
         run: npm ci --no-audit --no-fund && node bloquear-registro.js

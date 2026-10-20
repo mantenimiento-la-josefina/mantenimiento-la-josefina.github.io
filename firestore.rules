@@ -7,10 +7,10 @@ service cloud.firestore {
     function rol() { return miPerfil().data.rol; }
     function principal() { return activo() && rol() == 'Administrador principal'; }
     function gestor() { return activo() && rol() in ['Administrador principal', 'Administrador']; }
-    function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia']; }
-    function mecanico() { return activo() && rol() == 'Mecánico'; }
+    function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia', 'Coordinación']; }
+    function mecanico() { return activo() && rol() in ['Mecánico', 'Supervisor de mantenimiento']; }
     function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
-    function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Mecánico', 'Operador']; }
+    function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Operador']; }
     function cambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
     function esCuentaInicial() { return request.auth.token.email == '1000@lajosefina-dpc.app'; }
 
@@ -42,7 +42,7 @@ service cloud.firestore {
       allow create: if activo()
         && maquinaValida(request.resource.data.equipo)
         && (gestor() || (
-              rol() in ['Mecánico', 'Operador']
+              rol() in ['Mecánico', 'Supervisor de mantenimiento', 'Operador']
               && request.resource.data.tecnicoUid == request.auth.uid
               && request.resource.data.tecnico == miPerfil().data.nombre
               && request.resource.data.creadoEn == request.time

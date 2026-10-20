@@ -205,13 +205,14 @@ const MAQUINAS = [
   {id:'AMP-LB-001',clave:'B',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea B'}
 ];
 const PRINCIPAL = 'Administrador principal';
-const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Mecánico','Operador'];
+const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Coordinación','Supervisor de mantenimiento','Mecánico','Operador'];
+const ROLES_MANTTO = ['Mecánico','Supervisor de mantenimiento'];
 const ROLES_GESTION = [PRINCIPAL,'Administrador'];
-const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia'];
-const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
+const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia','Coordinación'];
+const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Coordinación':[1100,1999],'Supervisor de mantenimiento':[2000,2999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
 const PLANTAS = ['AM Pack','CIC','Ricaty','Flexi Pack'];
 function maquinasDe(pl){return MAQUINAS.filter(m=>m.planta===pl)}
-const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Mecánico':'warn','Operador':''};
+const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Coordinación':'plan','Supervisor de mantenimiento':'warn','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
 const PENDIENTES = ['Pendiente','Abierta'];
 const EN_ATENCION = ['En atención','En proceso'];
@@ -222,6 +223,7 @@ const VISTAS = {
   gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
   supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
+  'Supervisor de mantenimiento':['alertas','maquinas','ficha','registrar','falla','historial','abiertos','indicadores','pantalla','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
@@ -229,6 +231,7 @@ const NAV = {
   gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
   supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
+  'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['abiertos','Trabajos abiertos'],['historial','Historial'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
 
@@ -267,8 +270,9 @@ function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)
 function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
 function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
-function esMecanico(){return !!perfil&&perfil.rol==='Mecánico'}
+function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
 function atiende(){return esAdmin()||esMecanico()}
+function insiste(){return esMecanico()}
 function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
 function inicioRol(){return esSupervisor()?'panel':esMecanico()?'alertas':'falla'}
 function correoDe(u){u=String(u||'').replace(/\s+/g,'').toLowerCase();return u+'@'+DOMINIO}
@@ -354,8 +358,8 @@ function suscribir(){
   primeraCarga=true;
   subs.push(db.collection('registros').onSnapshot(s=>{
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
-    if(!primeraCarga&&atiende()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
-    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(atiende()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
+    if(!primeraCarga&&insiste()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
+    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
@@ -443,7 +447,7 @@ function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultim
     o.connect(g);g.connect(audioCtx.destination);o.start(t0);o.stop(t0+2.5)}catch(e){}
   try{navigator.vibrate&&navigator.vibrate([600,200,600,200,600])}catch(e){}}
 function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c))}
-function abrirAlarma(){if(!perfil||!atiende()||Date.now()<silencioHasta)return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
+function abrirAlarma(){if(!perfil||!insiste()||Date.now()<silencioHasta)return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
   const r=pend[0],m=maq(r.equipo),a=$('alarma');
   a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<button class="atender" data-atender="${esc(r.id)}">Atender falla</button><button class="callar" id="silenciar">Silenciar 5 min</button></div>`;
   a.hidden=false;sirena();
@@ -457,7 +461,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;
   const pend=REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
   let h='';
   const ep=estadoPush();
-  if(ep==='pendiente')h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
+  if(ep==='pendiente'&&insiste())h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
   if(ep==='ios-instalar')h+=`<div class="activar"><span>📲 Para recibir fallas con el iPhone bloqueado: toca Compartir → «Agregar a inicio» y abre la app desde ese ícono.</span></div>`;
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
   if(pend.length){const p=pend[0],m=maq(p.equipo);
@@ -689,7 +693,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   const cuenta=r=>USUARIOS.filter(u=>u.rol===r&&u.activo).length;
   const prin=esPrincipal();
   return `<h2>👥 ${prin?'Administración':'Alta'} de usuarios</h2>${prin?'':'<p class="aviso">Puedes dar de alta trabajadores. Para modificar, cambiar de puesto o desactivar una cuenta, pide apoyo al Administrador principal.</p>'}
-  <div class="grid">${kpi(USUARIOS.filter(u=>u.activo).length,'Cuentas activas')}${kpi(cuenta('Mecánico'),'Mecánicos')}${kpi(cuenta('Operador'),'Operadores')}${kpi(cuenta('Dirección')+cuenta('Gerencia')+cuenta('Administrador'),'Dirección, gerencia y administradores')}</div>
+  <div class="grid">${kpi(USUARIOS.filter(u=>u.activo).length,'Cuentas activas')}${kpi(cuenta('Mecánico')+cuenta('Supervisor de mantenimiento'),'Mecánicos y supervisores')}${kpi(cuenta('Operador'),'Operadores')}${kpi(cuenta('Dirección')+cuenta('Gerencia')+cuenta('Coordinación')+cuenta('Administrador'),'Dirección, gerencia, coordinación y administradores')}</div>
   ${ed&&prin?`<div class="card"><h2>Modificar usuario · ${esc(ed.nombre)}</h2>${formUsuario(ed)}
     ${SERVIDOR_LISTO?`<div class="card" style="box-shadow:none;border:1px solid var(--line);margin-top:16px"><h2>Restablecer contraseña</h2><form id="fReset" data-uid="${esc(ed.uid)}"><label for="r_pass">Nueva contraseña temporal (mín. 6)</label><input id="r_pass" required minlength="6" autocomplete="new-password"><div class="acciones"><button type="submit">Restablecer contraseña</button></div><div id="rErr"></div></form><p class="muted">Se cerrará la sesión del trabajador en todos sus dispositivos. Entrégale la nueva contraseña; puede cambiarla en «Mi cuenta».</p></div>`
     :`<div class="aviso" style="margin-top:16px"><b>Restablecer contraseña:</b> se activa cuando termine la instalación del servidor. Mientras tanto, el trabajador puede cambiarla en «Mi cuenta».</div>`}</div>`
@@ -704,12 +708,13 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="card"><h2>Permisos por puesto</h2>
   <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea administradores y modifica, cambia de puesto, activa o desactiva cuentas.</div></div>
   <div class="item"><div><span class="tag bad">Administrador</span> Acceso completo a trabajos, máquinas, calendario e indicadores. Puede dar de alta usuarios (excepto administradores).</div></div>
-  <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Consultan trabajos abiertos y registrados, historiales e indicadores. Pueden dar de alta usuarios (excepto administradores). No modifican registros.</div></div>
-  <div class="item"><div><span class="tag warn">Mecánico</span> Alertas de fallas en tiempo real, atender y finalizar fallas, registrar reparaciones, historiales técnicos.</div></div>
+  <div class="item"><div><span class="tag plan">Dirección / Gerencia / Coordinación</span> Consultan trabajos abiertos y registrados, historiales e indicadores. Pueden dar de alta usuarios (excepto administradores). No modifican registros.</div></div>
+  <div class="item"><div><span class="tag warn">Supervisor de mantenimiento</span> Igual que Mecánico, más trabajos abiertos e indicadores. Recibe la alarma fuerte de fallas.</div></div>
+  <div class="item"><div><span class="tag warn">Mecánico</span> Alarma fuerte de fallas (se repite hasta atender), atender y finalizar fallas, registrar reparaciones, historiales técnicos.</div></div>
   <div class="item"><div><span class="tag">Operador</span> Reportar fallas y consultar ajustes y reparaciones anteriores.</div></div>
-  <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia 1100–1999 · Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
+  <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Supervisores de mantenimiento y Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
-  ${atiende()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
+  ${insiste()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
@@ -806,7 +811,7 @@ async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';
 
 // Clics
 document.addEventListener('click',async e=>{
-  if(!sonidoOn&&perfil&&atiende()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
+  if(!sonidoOn&&perfil&&insiste()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
   const b=e.target.closest('button');if(!b)return;
   if(b.id==='salir'){cerrarAlarma();await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
   if(b.id==='activarPush'){activarPush(false);return}

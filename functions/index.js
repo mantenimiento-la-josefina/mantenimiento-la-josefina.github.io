@@ -15,9 +15,9 @@ const db = getFirestore();
 const URL_BASE = 'https://mantenimiento-la-josefina.github.io/';
 const DOMINIO = 'lajosefina-dpc.app';
 const PRINCIPAL = 'Administrador principal';
-const ROLES_ASIGNABLES = ['Administrador', 'Dirección', 'Gerencia', 'Mecánico', 'Operador'];
-const ROLES_ALTAS = [PRINCIPAL, 'Administrador', 'Dirección', 'Gerencia'];
-const ROLES_AVISO = ['Mecánico', PRINCIPAL, 'Administrador'];
+const ROLES_ASIGNABLES = ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Operador'];
+const ROLES_ALTAS = [PRINCIPAL, 'Administrador', 'Dirección', 'Gerencia', 'Coordinación'];
+const ROLES_AVISO = ['Mecánico', 'Supervisor de mantenimiento'];
 const MAQUINAS = {
   'AMP-LA-001': { planta: 'AM Pack', zona: 'Línea A', nombre: 'Envasadora vertical' },
   'AMP-LB-001': { planta: 'AM Pack', zona: 'Línea B', nombre: 'Envasadora vertical' },

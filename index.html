@@ -187,21 +187,29 @@ const MAQUINAS = [
   {id:'AMP-LA-001',clave:'A',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea A'},
   {id:'AMP-LB-001',clave:'B',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea B'}
 ];
-const ROLES = ['Dirección','Gerencia','Mecánico','Operador'];
-const ROLES_ADMIN = ['Dirección','Gerencia'];
-const RANGOS = {'Dirección':[1000,1099],'Gerencia':[1100,1999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
+const PRINCIPAL = 'Administrador principal';
+const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Mecánico','Operador'];
+const ROLES_GESTION = [PRINCIPAL,'Administrador'];
+const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia'];
+const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
+const PLANTAS = ['AM Pack'];
+const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
 const PENDIENTES = ['Pendiente','Abierta'];
 const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  admin:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
+  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
+  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','pantalla','cuenta'],
+  supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','pantalla','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
-  admin:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','Usuarios'],['pantalla','Pantalla de mantenimiento']],
+  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['pantalla','Pantalla de mantenimiento']],
+  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
+  supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
@@ -234,12 +242,17 @@ function maqPorClave(c){return MAQUINAS.find(m=>m.clave===String(c||'').toUpperC
 function tagMaq(id){const m=maq(id);if(!m)return `<span class="tag neu">${esc(id)}</span>`;return `<span class="tag ${m.clave==='A'?'la':'lb'}">${esc(m.zona)}</span>`}
 function tagEstado(e){if(CERRADOS.includes(e))return `<span class="tag">${esc(e)}</span>`;if(EN_ATENCION.includes(e))return `<span class="tag warn">${esc(e)}</span>`;return `<span class="tag bad">${esc(e||'Pendiente')}</span>`}
 function tagTipo(t){if(t==='Reporte de falla')return `<span class="tag bad">Falla</span>`;if(t==='Correctivo')return `<span class="tag warn">Correctivo</span>`;if(t==='Preventivo')return `<span class="tag plan">Preventivo</span>`;return `<span class="tag neu">${esc(t)}</span>`}
-function esAdmin(){return !!perfil&&perfil.activo===true&&ROLES_ADMIN.includes(perfil.rol)}
-function grupo(){return esAdmin()?'admin':(perfil&&perfil.rol)}
+function activoP(){return !!perfil&&perfil.activo===true}
+function esPrincipal(){return activoP()&&perfil.rol===PRINCIPAL}
+function esAdmin(){return activoP()&&ROLES_GESTION.includes(perfil.rol)} // puede modificar registros y configuración
+function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)}
+function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
+function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
+function deMiLinea(r){const l=misLineas();return !l||l.includes(r.equipo)}
 function esMecanico(){return !!perfil&&perfil.rol==='Mecánico'}
 function atiende(){return esAdmin()||esMecanico()}
 function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
-function inicioRol(){return esAdmin()?'panel':esMecanico()?'alertas':'falla'}
+function inicioRol(){return esSupervisor()?'panel':esMecanico()?'alertas':'falla'}
 function correoDe(u){u=String(u||'').replace(/\s+/g,'').toLowerCase();return u+'@'+DOMINIO}
 function usuarioDe(correo){return String(correo||'').replace('@'+DOMINIO,'')}
 function ms(t){try{if(t&&t.toMillis)return t.toMillis()}catch(e){}return null}
@@ -251,11 +264,11 @@ function fallaPendiente(r){return esFalla(r)&&PENDIENTES.includes(r.estado)}
 function fallaEnAtencion(r){return esFalla(r)&&EN_ATENCION.includes(r.estado)}
 function deMaq(arr,id){return id==='todas'?arr:arr.filter(r=>r.equipo===id)}
 function errTxt(e){const c=(e&&e.code)||'';
-  if(c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-login-credentials')return 'Número de empleado o contraseña incorrectos.';
+  if(c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-login-credentials')return 'Usuario o contraseña incorrectos.';
   if(c==='auth/too-many-requests')return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
-  if(c==='auth/email-already-in-use')return 'Ese número de empleado ya tiene cuenta.';
+  if(c==='auth/email-already-in-use')return 'Ese nombre de usuario ya está ocupado. Elige otro.';
   if(c==='auth/weak-password')return 'La contraseña debe tener al menos 6 caracteres.';
-  if(c==='auth/invalid-email')return 'El número de empleado solo puede tener dígitos.';
+  if(c==='auth/invalid-email')return 'El usuario solo puede tener letras sin acento, números, punto, guion o guion bajo.';
   if(c==='auth/network-request-failed'||c==='unavailable')return 'Sin conexión. Revisa tu internet e inténtalo de nuevo.';
   if(c==='permission-denied')return 'No tienes permiso para esta acción.';
   if(c==='auth/requires-recent-login')return 'Por seguridad, cierra sesión, vuelve a entrar y repite el cambio.';
@@ -303,11 +316,11 @@ function suscribir(){
   primeraCarga=true;
   subs.push(db.collection('registros').onSnapshot(s=>{
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
-    if(!primeraCarga&&atiende()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente);if(nuevas.length)nuevaFalla(nuevas[0])}
+    if(!primeraCarga&&atiende()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
     primeraCarga=false;pintarBanner();render()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
-  if(esAdmin())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
+  if(esPrincipal())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
 }
 function entrar(){
   pintarSesion();
@@ -317,7 +330,7 @@ function entrar(){
 }
 function pintarSesion(){
   const s=$('sesion');s.hidden=false;
-  s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(perfil.rol)} · No. ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
+  s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(perfil.rol)} · ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
   const n=$('nav');n.hidden=false;n.className=perfil.rol==='Operador'?'grande':'';
   n.innerHTML=(NAV[grupo()]||[]).map(([v,t])=>`<button data-v="${v}">${t}</button>`).join('');
   marcarNav();
@@ -331,30 +344,30 @@ function pantallaLogin(){
   const m=destino&&destino.maq?maq(destino.maq):null;
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
   ${m?`<p class="aviso">Al entrar verás la ficha de la ${esc(m.nombre)} · ${esc(m.zona)}.</p>`:''}
-  <form id="fLogin"><label for="l_user">Número de empleado</label><input id="l_user" name="u" inputmode="numeric" pattern="[0-9]*" autocomplete="username" required>
+  <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="l_pass">Contraseña</label><input id="l_pass" name="p" type="password" autocomplete="current-password" required>
   <div class="acciones"><button type="submit" class="xl">Entrar</button></div><div id="lErr"></div></form>
   <p class="muted" style="margin-top:18px">¿Olvidaste tu contraseña? Pide a Dirección o Gerencia que te asigne una nueva cuenta.</p>
   <p class="muted"><a href="#" id="abrirInicial">Configuración inicial (solo la primera vez)</a></p></div>
-  <div class="card" id="cardInicial" hidden><h2>Configuración inicial</h2><p class="muted">Crea la primera cuenta de Dirección. Su número de empleado será <b>${USUARIO_INICIAL}</b>. Después, desde esa cuenta se dan de alta los demás trabajadores.</p>
+  <div class="card" id="cardInicial" hidden><h2>Configuración inicial</h2><p class="muted">Crea la cuenta del Administrador principal. Su usuario será <b>${USUARIO_INICIAL}</b>. Después, desde esa cuenta se dan de alta los demás trabajadores.</p>
   <form id="fInicial"><label for="i_nom">Nombre completo</label><input id="i_nom" required maxlength="80">
   <label for="i_pass">Contraseña (mínimo 6 caracteres)</label><input id="i_pass" type="password" autocomplete="new-password" minlength="6" required>
-  <div class="acciones"><button type="submit">Crear cuenta de Dirección</button></div><div id="iErr"></div></form></div></div>`;
+  <div class="acciones"><button type="submit">Crear cuenta de Administrador principal</button></div><div id="iErr"></div></form></div></div>`;
   $('abrirInicial').onclick=e=>{e.preventDefault();$('cardInicial').hidden=false;$('i_nom').focus()};
   $('fLogin').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;$('lErr').innerHTML='';desbloquearAudio();
     try{await auth.signInWithEmailAndPassword(correoDe($('l_user').value),$('l_pass').value)}catch(er){$('lErr').innerHTML=`<p class="error">${esc(errTxt(er))}</p>`;b.disabled=false}};
   $('fInicial').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;$('iErr').innerHTML='';
     try{const c=await auth.createUserWithEmailAndPassword(correoDe(USUARIO_INICIAL),$('i_pass').value);
-      await db.collection('usuarios').doc(c.user.uid).set({nombre:$('i_nom').value.trim(),usuario:USUARIO_INICIAL,rol:'Dirección',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()});
-    }catch(er){const box=$('iErr');if(box){box.innerHTML=`<p class="error">${esc(er.code==='auth/email-already-in-use'?'La configuración inicial ya se hizo. Entra con el número '+USUARIO_INICIAL+'.':errTxt(er))}</p>`;b.disabled=false}else toast(errTxt(er))}};
+      await db.collection('usuarios').doc(c.user.uid).set({nombre:$('i_nom').value.trim(),usuario:USUARIO_INICIAL,rol:PRINCIPAL,planta:PLANTAS[0],linea:'todas',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()});
+    }catch(er){const box=$('iErr');if(box){box.innerHTML=`<p class="error">${esc(er.code==='auth/email-already-in-use'?'La configuración inicial ya se hizo. Entra con el usuario '+USUARIO_INICIAL+'.':errTxt(er))}</p>`;b.disabled=false}else toast(errTxt(er))}};
 }
 function pantallaSinAcceso(extra){
   ocultarSesion();
   if(usuario&&!perfil&&usuario.email===correoDe(USUARIO_INICIAL)){
-    $('app').innerHTML=`<div class="login"><div class="card"><h2>Terminar configuración inicial</h2><p>Tu cuenta ${USUARIO_INICIAL} ya existe, pero falta registrarla como Dirección.</p>
+    $('app').innerHTML=`<div class="login"><div class="card"><h2>Terminar configuración inicial</h2><p>Tu cuenta ${USUARIO_INICIAL} ya existe, pero falta registrarla como Administrador principal.</p>
     <form id="fFin"><label for="fin_nom">Nombre completo</label><input id="fin_nom" required maxlength="80"><div class="acciones"><button type="submit">Terminar configuración</button><button type="button" class="sec" id="salir">Cerrar sesión</button></div><div id="finErr"></div></form></div></div>`;
     $('fFin').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;$('finErr').innerHTML='';
-      try{await db.collection('usuarios').doc(usuario.uid).set({nombre:$('fin_nom').value.trim(),usuario:USUARIO_INICIAL,rol:'Dirección',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()})}
+      try{await db.collection('usuarios').doc(usuario.uid).set({nombre:$('fin_nom').value.trim(),usuario:USUARIO_INICIAL,rol:PRINCIPAL,planta:PLANTAS[0],linea:'todas',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()})}
       catch(er){$('finErr').innerHTML=`<p class="error">${er&&er.code==='permission-denied'?'Firebase rechazó el registro: revisa que en Firestore → Reglas estén publicadas las reglas que dicen 1000@lajosefina-dpc.app.':esc(errTxt(er))}</p>`;b.disabled=false}};
     return}
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Cuenta sin acceso</h2><p>Tu cuenta no está activa en el sistema. Pide a Dirección o Gerencia que la active.</p>${extra?`<p class="error">${esc(extra)}</p>`:''}<div class="acciones"><button id="salir">Cerrar sesión</button></div></div></div>`;
@@ -377,7 +390,7 @@ function render(forzar){
   pendiente=false;
   const a=$('app');a.innerHTML=V[vista]();a.dataset.v=vista;a.dataset.sucio='';
   marcarNav();enlazar();pintarBanner();
-  if(vista==='ficha'&&esAdmin())pintarQR(maqSel,'qrbox');
+  if(vista==='ficha'&&esSupervisor())pintarQR(maqSel,'qrbox');
 }
 document.addEventListener('input',e=>{if(e.target.closest('#app form'))$('app').dataset.sucio='1'});
 
@@ -392,7 +405,7 @@ function nuevaFalla(r){sirena();const m=maq(r.equipo);toast('🚨 Nueva falla en
 function parpadearTitulo(){if(parpadearTitulo._i)return;let on=false;const orig='Mantenimiento La Josefina DPC';parpadearTitulo._i=setInterval(()=>{const n=REG.filter(fallaPendiente).length;if(!n){clearInterval(parpadearTitulo._i);parpadearTitulo._i=null;document.title=orig;return}on=!on;document.title=on?'🚨 ('+n+') FALLA PENDIENTE':orig},1000)}
 function pintarBanner(){const b=$('banner');if(!b)return;
   if(!perfil||!atiende()||vista==='pantalla'){b.innerHTML='';return}
-  const pend=REG.filter(fallaPendiente).sort((a,c)=>msCreado(a)-msCreado(c));
+  const pend=REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
   let h='';
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
   if(pend.length){const p=pend[0],m=maq(p.equipo);
@@ -400,7 +413,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;
     <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button></div></div>`}
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
-setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(fallaPendiente)&&Date.now()-ultimoSonido>45000)sirena()},1000);
+setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena()},1000);
 async function pedirWakeLock(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
 function soltarWakeLock(){try{if(wakeLock){wakeLock.release();wakeLock=null}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&vista==='pantalla')pedirWakeLock()});
@@ -469,7 +482,9 @@ function formFinalizar(r){return `<form id="fFinalizar" data-id="${esc(r.id)}" s
 const V={};
 V.panel=()=>{
   const regs=registros(),ab=regs.filter(abierto),mig=migrables();
-  return `${mig?`<div class="aviso"><b>Registros de la versión anterior:</b> este dispositivo tiene ${mig} registro(s) guardados antes de la base de datos (Línea A). <button class="mini" id="migrar" style="margin-left:6px">Subirlos al sistema</button></div>`:''}
+  const migPrincipal=perfil.rol==='Dirección'&&usuario.email===correoDe(USUARIO_INICIAL);
+  return `${migPrincipal?`<div class="card" style="border:2px solid var(--accent)"><h2>🔴 Activar Administrador principal</h2><p>Tu cuenta <b>${USUARIO_INICIAL}</b> pasará de «Dirección» a «Administrador principal», con acceso completo y la administración de usuarios. Se conserva toda la información.</p><div class="acciones"><button id="hacerPrincipal">Activar Administrador principal</button></div><div id="hpErr"></div></div>`:''}
+  ${mig?`<div class="aviso"><b>Registros de la versión anterior:</b> este dispositivo tiene ${mig} registro(s) guardados antes de la base de datos (Línea A). <button class="mini" id="migrar" style="margin-left:6px">Subirlos al sistema</button></div>`:''}
   <div class="grid">${kpi(regs.length,'Trabajos registrados')}${kpi(ab.length,'Trabajos abiertos')}${kpi(regs.filter(fallaPendiente).length,'Fallas sin atender')}${kpi(regs.filter(fallaEnAtencion).length,'Fallas en atención')}</div>
   <div class="grid2">${MAQUINAS.map(m=>{const e=estadoMaq(m.id),p=proximo(m.id),r=registros(m.id);return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.nombre)} · ${esc(m.zona)}</h2><p style="margin:0 0 8px">${tagMaq(m.id)} <span class="tag ${e.cls}">${esc(e.txt)}</span></p>
     <dl class="dl"><dt>Trabajos</dt><dd>${r.length}</dd><dt>Abiertos</dt><dd>${r.filter(abierto).length}</dd><dt>Próximo mantenimiento</dt><dd>${p?fmt(p.fecha)+(p.vencido?' <span class="tag bad">Vencido</span>':''):'Sin programar'}</dd></dl>
@@ -526,7 +541,7 @@ function formMant(){
 V.registrar=formMant;
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));
   return `<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
-  <label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>
+  <label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${(maqForm||(misLineas()||[])[0])===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>
   <label for="f_tipo">Tipo de falla</label><select id="f_tipo" required><option value="" selected disabled>Selecciona el tipo de falla…</option>${TIPOS_FALLA.map(t=>`<option>${t}</option>`).join('')}</select>
   <label>¿La línea está detenida?</label><div class="opciones"><label><input type="radio" name="f_paro" value="si" required> Sí, está detenida</label><label><input type="radio" name="f_paro" value="no"> No, sigue trabajando</label></div>
   <label for="f_desc">Descripción del problema</label><textarea id="f_desc" required maxlength="2000" placeholder="Qué pasa, en qué parte de la máquina, qué se observa"></textarea>
@@ -568,16 +583,16 @@ V.calendario=()=>{
   <div class="cal">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="dow">${d}</div>`).join('')}${celdas}</div>
   <div class="leyenda"><span><i class="m plan"></i>Programado</span><span><i class="m ok"></i>Realizado</span><span><i class="m warn"></i>Pendiente</span><span><i class="m bad"></i>Falla</span></div></div>
   ${det}<div class="card"><h2>Mantenimientos programados</h2>${pend.length?pend.map(itemProg).join(''):'<p class="muted">No hay mantenimientos programados.</p>'}</div>
-  <div class="card"><h2>Programar mantenimiento preventivo</h2><form id="formProg">
+  ${esAdmin()?`<div class="card"><h2>Programar mantenimiento preventivo</h2><form id="formProg">
   <label for="p_maq">Máquina</label><select id="p_maq">${opcionesMaq(calMaq==='todas'?maqSel:calMaq)}</select>
   <div class="dos"><div><label for="p_fecha">Fecha</label><input id="p_fecha" type="date" required value="${esc(diaSel||hoy())}"></div><div><label for="p_resp">Responsable</label><input id="p_resp" maxlength="120"></div></div>
   <label for="p_act">Actividad</label><input id="p_act" required maxlength="250" placeholder="Ej. Revisión de mordazas de sellado y lubricación">
   <label for="p_rep">Repetir</label><select id="p_rep"><option value="0">Solo una vez</option><option value="7">Cada semana (8 veces)</option><option value="14">Cada 2 semanas (6 veces)</option><option value="30">Cada 30 días (6 veces)</option></select>
-  <div class="acciones"><button type="submit">Agregar al calendario</button></div></form></div>`;
+  <div class="acciones"><button type="submit">Agregar al calendario</button></div></form></div>`:''}`;
 };
 function itemProg(x){const venc=x.estado!=='Realizado'&&x.fecha<hoy();
   return `<div class="item"><div>${tagMaq(x.equipo)} <span class="tag ${x.estado==='Realizado'?'':venc?'bad':'plan'}">${x.estado==='Realizado'?'Realizado':venc?'Vencido':'Programado'}</span> <b>${fmt(x.fecha)}</b> · ${esc(x.actividad)}${x.responsable?`<br><small class="muted">Responsable: ${esc(x.responsable)}</small>`:''}</div>
-  <div class="acciones" style="margin:0;flex-shrink:0">${x.estado!=='Realizado'?`<button class="mini" data-realizar="${esc(x.id)}">Registrar</button>`:''}<button class="mini peligro" data-borrarprog="${esc(x.id)}">Quitar</button></div></div>`}
+  ${esAdmin()?'':'<!--'}<div class="acciones" style="margin:0;flex-shrink:0">${x.estado!=='Realizado'?`<button class="mini" data-realizar="${esc(x.id)}">Registrar</button>`:''}<button class="mini peligro" data-borrarprog="${esc(x.id)}">Quitar</button></div>${esAdmin()?'':'-->'}</div>`}
 function prom(arr){const v=arr.filter(x=>x!=null&&!isNaN(x)&&x>=0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null}
 function barras(obj,vacio){const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]);if(!e.length)return `<p class="muted">${vacio}</p>`;const mx=Math.max(1,...e.map(x=>x[1]));return e.map(([t,c])=>`<div class="barra"><span>${esc(t)}</span><div class="pista"><div class="relleno" style="width:${100*c/mx}%"></div></div><b>${c}</b></div>`).join('')}
 V.indicadores=()=>{
@@ -601,23 +616,45 @@ V.indicadores=()=>{
   <div class="grid">${kpi(minutos,'Minutos de mantenimiento registrados')}${kpi(paro,'Minutos de paro capturados')}${kpi(n?Math.round(100*comp/n)+'%':'—','Registros finalizados')}</div>
   <p class="muted">Los tiempos se calculan con la hora del reporte, la hora en que un mecánico presiona «Atender falla» y la hora en que presiona «Finalizar trabajo». Las fallas registradas antes de esta versión no tienen esos tiempos.</p>`;
 };
-function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.usuario)));for(let n=r[0]+(rol==='Dirección'?1:0);n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
-V.usuarios=()=>{const dir=perfil.rol==='Dirección';const lista=USUARIOS.slice().sort((a,b)=>(b.activo-a.activo)||String(a.usuario).localeCompare(String(b.usuario),undefined,{numeric:true}));
-  const rolIni='Mecánico';
-  return `<div class="card"><h2>Trabajadores con acceso</h2><div class="scroll"><table><thead><tr><th>No. empleado</th><th>Nombre</th><th>Puesto</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(u=>{const prot=u.rol==='Dirección'&&!dir,yo=u.uid===usuario.uid;return `<tr>
-  <td class="num">${esc(u.usuario)}</td><td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td>
-  <td>${prot||yo?esc(u.rol):`<select data-rol="${esc(u.uid)}" aria-label="Puesto de ${esc(u.nombre)}">${ROLES.filter(r=>dir||r!=='Dirección').map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select>`}</td>
-  <td>${u.activo?'<span class="tag">Activo</span>':'<span class="tag neu">Sin acceso</span>'}</td>
-  <td>${prot||yo?'':`<button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Quitar acceso':'Dar acceso'}</button>`}</td></tr>`}).join('')}</tbody></table></div></div>
-  <div class="card"><h2>Dar de alta a un trabajador</h2><p class="muted">Números por puesto: Dirección 1000–1099 · Gerencia 1100–1999 · Mecánicos 2000–2999 · Operadoras 3000–3999.</p><form id="fAlta">
-  <div class="dos"><div><label for="a_nom">Nombre completo</label><input id="a_nom" required maxlength="80"></div>
-  <div><label for="a_rol">Puesto</label><select id="a_rol">${ROLES.filter(r=>dir||r!=='Dirección').map(r=>`<option ${r===rolIni?'selected':''}>${r}</option>`).join('')}</select></div></div>
-  <div class="dos"><div><label for="a_user">Número de empleado</label><input id="a_user" required maxlength="10" inputmode="numeric" pattern="[0-9]+" value="${siguienteNumero(rolIni)}"><small class="muted" id="a_hint"></small></div>
-  <div><label for="a_pass">Contraseña temporal (mín. 6)</label><input id="a_pass" required minlength="6" autocomplete="new-password"></div></div>
-  <div class="acciones"><button type="submit">Crear cuenta</button></div><div id="aErr"></div></form>
-  <p class="muted">Entrega al trabajador su número de empleado y su contraseña. Puede cambiar la contraseña en «Mi cuenta». Si la olvida, quita el acceso a esa cuenta y crea una nueva con otro número.</p>
-  <p class="muted"><b>Pantalla del área de mantenimiento:</b> crea una cuenta con puesto «Mecánico» (por ejemplo, nombre «Pantalla mantenimiento») e inicia sesión con ella en la tablet o pantalla; luego elige «Pantalla de mantenimiento».</p></div>`};
-V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>No. empleado</dt><dd>${esc(usuarioDe(usuario.email))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
+function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.numEmpleado||u.usuario)));for(let n=r[0]+1;n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
+function nombreLinea(l){if(!l||l==='todas')return 'Ambas líneas';const m=maq(l);return m?m.zona:l}
+let usrEdit=null, usrAlta=false, usrFiltro='';
+function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],linea:'todas',activo:true};
+  return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
+  <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
+  <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
+  <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></div>
+  <div><label for="u_planta">Planta</label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
+  <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Ambas líneas</option>${MAQUINAS.map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
+  <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
+  ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>
+  <div><label for="u_pass">Contraseña inicial (mín. 6)</label><input id="u_pass" required minlength="6" autocomplete="new-password"></div></div>
+  <p class="muted" style="margin:8px 0 0">El usuario solo puede tener letras sin acento, números, punto, guion o guion bajo. No se puede cambiar después.</p>`
+  :`<label>Nombre de usuario</label><input value="${esc(u.usuario)}" disabled>`}
+  <div class="acciones"><button type="submit">${nuevo?'Crear usuario':'Guardar cambios'}</button><button type="button" class="sec" id="cancelUsr">Cancelar</button></div><div id="uErr"></div></form>`}
+V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().filter(u=>!q||[u.nombre,u.usuario,u.numEmpleado,u.rol].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.activo-a.activo)||ROLES_ASIGNABLES.indexOf(a.rol)-ROLES_ASIGNABLES.indexOf(b.rol)||String(a.nombre).localeCompare(b.nombre));
+  const ed=usrEdit?USUARIOS.find(u=>u.uid===usrEdit):null;
+  const cuenta=r=>USUARIOS.filter(u=>u.rol===r&&u.activo).length;
+  return `<h2>👥 Administración de usuarios</h2>
+  <div class="grid">${kpi(USUARIOS.filter(u=>u.activo).length,'Cuentas activas')}${kpi(cuenta('Mecánico'),'Mecánicos')}${kpi(cuenta('Operador'),'Operadores')}${kpi(cuenta('Dirección')+cuenta('Gerencia')+cuenta('Administrador'),'Dirección, gerencia y administradores')}</div>
+  ${ed?`<div class="card"><h2>Modificar usuario · ${esc(ed.nombre)}</h2>${formUsuario(ed)}
+    <div class="aviso" style="margin-top:16px"><b>Restablecer contraseña:</b> por seguridad, Firebase solo permite cambiar la contraseña de otra persona desde un servidor. Esta función se activa en la fase de notificaciones push (plan Blaze). Mientras tanto, el trabajador puede cambiarla en «Mi cuenta»; si la olvidó, desactiva esta cuenta y crea una nueva con otro usuario.</div></div>`
+  :usrAlta?`<div class="card"><h2>Agregar usuario</h2>${formUsuario(null)}</div>`
+  :`<div class="acciones" style="margin:0 0 16px"><button id="altaUsr" class="xl">+ Agregar usuario</button></div>`}
+  <div class="card"><h2>Usuarios registrados (${USUARIOS.length})</h2><label for="u_buscar">Buscar</label><input id="u_buscar" value="${esc(usrFiltro)}" placeholder="Nombre, usuario, número o puesto">
+  <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>No. empl.</th><th>Puesto</th><th>Planta / línea</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(u=>{const yo=u.uid===usuario.uid,prot=u.rol===PRINCIPAL;return `<tr>
+  <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
+  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(u.rol)}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
+  <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
+  <td>${prot||yo?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
+  <div class="card"><h2>Permisos por puesto</h2>
+  <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea y administra usuarios y asigna puestos.</div></div>
+  <div class="item"><div><span class="tag bad">Administrador</span> Acceso completo a trabajos, máquinas, calendario e indicadores. No administra usuarios.</div></div>
+  <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Consultan trabajos abiertos y registrados, historiales e indicadores. No modifican registros ni usuarios.</div></div>
+  <div class="item"><div><span class="tag warn">Mecánico</span> Alertas de fallas en tiempo real, atender y finalizar fallas, registrar reparaciones, historiales técnicos.</div></div>
+  <div class="item"><div><span class="tag">Operador</span> Reportar fallas y consultar ajustes y reparaciones anteriores.</div></div>
+  <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia 1100–1999 · Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
+V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
   <div class="acciones"><button type="submit">Cambiar contraseña</button></div><div id="cErr"></div></form></div>`;
@@ -674,7 +711,9 @@ function enlazar(){
     try{const batch=db.batch();for(let i=0;i<veces;i++)batch.set(db.collection('programa').doc(),{equipo:$('p_maq').value,fecha:sumarDias(fe,rep*i),actividad:$('p_act').value.trim(),responsable:$('p_resp').value.trim(),estado:'Programado',creadoEn:TS()});await batch.commit();
       diaSel=fe;calMes=new Date(aFecha(fe).getFullYear(),aFecha(fe).getMonth(),1);toast(veces>1?veces+' mantenimientos programados.':'Mantenimiento programado.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}};
   const fc=$('fCfg');if(fc)fc.onsubmit=async ev=>{ev.preventDefault();try{await db.collection('maquinas').doc(maqSel).set({frecuenciaDias:$('frec').value},{merge:true});toast('Frecuencia guardada.');render(true)}catch(e){toast(errTxt(e))}};
-  const fa=$('fAlta');if(fa){fa.onsubmit=altaUsuario;const ar=$('a_rol'),au=$('a_user'),hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('a_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{au.value=siguienteNumero(ar.value);hint()};au.oninput=hint}
+  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
+  const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
+  const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
   const fpw=$('fPass');if(fpw)fpw.onsubmit=async ev=>{ev.preventDefault();$('cErr').innerHTML='';if($('c_pass').value!==$('c_pass2').value){$('cErr').innerHTML='<p class="error">Las contraseñas no coinciden.</p>';return}
     try{await usuario.updatePassword($('c_pass').value);toast('Contraseña cambiada.');render(true)}catch(e){$('cErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
   const ht=$('histTipo');if(ht)ht.onchange=()=>{histTipo=ht.value;render(true)};
@@ -688,14 +727,19 @@ function enlazar(){
   const iq=$('imprimirQR');if(iq)iq.onclick=imprimirQR;
   const mg=$('migrar');if(mg)mg.onclick=migrar;
 }
-async function altaUsuario(ev){ev.preventDefault();const b=ev.target.querySelector('button');b.disabled=true;$('aErr').innerHTML='';
-  const u=$('a_user').value.trim(),rol=$('a_rol').value;
-  if(!/^[0-9]{1,10}$/.test(u)){$('aErr').innerHTML='<p class="error">El número de empleado solo puede tener dígitos (máximo 10).</p>';b.disabled=false;return}
-  try{const sec=fb.apps.find(a=>a.name==='altas')||fb.initializeApp(FIREBASE_CONFIG,'altas');
-    const c=await sec.auth().createUserWithEmailAndPassword(correoDe(u),$('a_pass').value);const uid=c.user.uid;await sec.auth().signOut();
-    await db.collection('usuarios').doc(uid).set({nombre:$('a_nom').value.trim(),usuario:u,rol,activo:true,creadoPor:usuario.uid,creadoEn:TS()});
-    toast('Cuenta creada: No. '+u+' · '+$('a_nom').value.trim()+'.');render(true)
-  }catch(e){$('aErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}}
+async function guardarUsuario(ev){ev.preventDefault();const f=ev.target,b=f.querySelector('button[type=submit]');b.disabled=true;$('uErr').innerHTML='';
+  const uid=f.dataset.uid,num=$('u_num').value.trim();
+  const datos={nombre:$('u_nom').value.trim(),numEmpleado:num,rol:$('u_rol').value,planta:$('u_planta').value,linea:$('u_linea').value,activo:$('u_act').value==='1'};
+  if(num&&!/^[0-9]{1,10}$/.test(num)){$('uErr').innerHTML='<p class="error">El número de empleado solo puede tener dígitos.</p>';b.disabled=false;return}
+  try{
+    if(uid){await db.collection('usuarios').doc(uid).update(Object.assign(datos,{modificadoPor:usuario.uid,modificadoEn:TS()}));usrEdit=null;toast('Datos de '+datos.nombre+' actualizados.');render(true);return}
+    const u=$('u_user').value.trim().toLowerCase();
+    if(!/^[a-z0-9._-]{2,40}$/.test(u)){$('uErr').innerHTML='<p class="error">El usuario debe tener de 2 a 40 caracteres: letras sin acento, números, punto, guion o guion bajo. Sin espacios.</p>';b.disabled=false;return}
+    const sec=fb.apps.find(a=>a.name==='altas')||fb.initializeApp(FIREBASE_CONFIG,'altas');
+    const c=await sec.auth().createUserWithEmailAndPassword(correoDe(u),$('u_pass').value);const nuid=c.user.uid;await sec.auth().signOut();
+    await db.collection('usuarios').doc(nuid).set(Object.assign(datos,{usuario:u,creadoPor:usuario.uid,creadoEn:TS()}));
+    usrAlta=false;toast('Usuario «'+u+'» creado para '+datos.nombre+'.');render(true)
+  }catch(e){$('uErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}}
 async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';const ref=db.collection('registros').doc(id);
   try{await db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)throw {code:'tomada'};const d=s.data();if(!PENDIENTES.includes(d.estado))throw {code:'tomada'};
       tx.update(ref,{estado:'En atención',atendidoUid:usuario.uid,atendidoPor:perfil.nombre,inicioAtencion:TS()})});
@@ -732,9 +776,11 @@ document.addEventListener('click',async e=>{
     if(b.dataset.ok!=='1'){b.dataset.ok='1';const t=b.textContent;b.textContent='¿Confirmar?';setTimeout(()=>{if(b.isConnected){b.dataset.ok='';b.textContent=t}},4000);return}
     try{if(b.dataset.borrar){await db.collection('registros').doc(b.dataset.borrar).delete();toast('Registro eliminado.')}else{await db.collection('programa').doc(b.dataset.borrarprog).delete();toast('Programa eliminado.')}}catch(er){toast(errTxt(er))}return}
   if(b.dataset.realizar){const p=PROG.find(x=>x.id===b.dataset.realizar);if(!p)return;prefill={progId:p.id,equipo:p.equipo,fecha:p.fecha<=hoy()?hoy():p.fecha,actividad:p.actividad,tecnico:p.responsable||perfil.nombre,tipo:'Preventivo'};ir('registrar',true);return}
-  if(b.dataset.activo){const u=USUARIOS.find(x=>x.uid===b.dataset.activo);if(!u)return;try{await db.collection('usuarios').doc(u.uid).update({activo:!u.activo});toast(u.activo?'Acceso retirado.':'Acceso activado.')}catch(er){toast(errTxt(er))}return}
+  if(b.id==='altaUsr'){usrAlta=true;usrEdit=null;render(true);return}
+  if(b.dataset.editusr){usrEdit=b.dataset.editusr;usrAlta=false;render(true);window.scrollTo({top:0});return}
+  if(b.dataset.activo){const u=USUARIOS.find(x=>x.uid===b.dataset.activo);if(!u)return;try{await db.collection('usuarios').doc(u.uid).update({activo:!u.activo});toast(u.activo?'Cuenta desactivada.':'Cuenta activada.')}catch(er){toast(errTxt(er))}return}
 });
-document.addEventListener('change',async e=>{const s=e.target.closest('select[data-rol]');if(!s||!esAdmin())return;try{await db.collection('usuarios').doc(s.dataset.rol).update({rol:s.value});toast('Puesto actualizado.')}catch(er){toast(errTxt(er));render(true)}});
+document.addEventListener('change',async e=>{const s=e.target.closest('select[data-rol]');if(!s||!esPrincipal())return;try{await db.collection('usuarios').doc(s.dataset.rol).update({rol:s.value});toast('Puesto actualizado.')}catch(er){toast(errTxt(er));render(true)}});
 
 // ===== Registros de la versión anterior (solo en este dispositivo) =====
 function migrables(){if(LS.get('dpc_migrado',false))return 0;return LS.get('dpc_registros',[]).length+LS.get('dpc_programa',[]).length}

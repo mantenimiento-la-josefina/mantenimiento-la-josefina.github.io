@@ -5,37 +5,47 @@ service cloud.firestore {
     function miPerfil() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
     function activo() { return sesion() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && miPerfil().data.activo == true; }
     function rol() { return miPerfil().data.rol; }
-    function admin() { return activo() && rol() in ['Dirección', 'Gerencia']; }
+    function principal() { return activo() && rol() == 'Administrador principal'; }
+    function gestor() { return activo() && rol() in ['Administrador principal', 'Administrador']; }
     function mecanico() { return activo() && rol() == 'Mecánico'; }
     function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
-    function rolValido(r) { return r in ['Dirección', 'Gerencia', 'Mecánico', 'Operador']; }
+    function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Mecánico', 'Operador']; }
     function cambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
+    function esCuentaInicial() { return request.auth.token.email == '1000@lajosefina-dpc.app'; }
 
+    // Cuentas: solo el Administrador principal crea, modifica, activa y desactiva usuarios
     match /usuarios/{uid} {
-      allow read: if admin() || (sesion() && request.auth.uid == uid);
-      allow create: if sesion() && request.auth.uid == uid
-        && request.auth.token.email == '1000@lajosefina-dpc.app'
-        && request.resource.data.rol == 'Dirección'
+      allow read: if principal() || (sesion() && request.auth.uid == uid);
+      // Configuración inicial (solo la cuenta 1000, una vez)
+      allow create: if sesion() && request.auth.uid == uid && esCuentaInicial()
+        && request.resource.data.rol in ['Dirección', 'Administrador principal']
         && request.resource.data.activo == true;
-      allow create: if admin() && rolValido(request.resource.data.rol)
-        && (request.resource.data.rol != 'Dirección' || rol() == 'Dirección');
-      allow update: if admin() && request.auth.uid != uid
-        && rolValido(request.resource.data.rol)
-        && (rol() == 'Dirección' || (resource.data.rol != 'Dirección' && request.resource.data.rol != 'Dirección'));
+      // La cuenta 1000 pasa de Dirección a Administrador principal sin perder nada
+      allow update: if sesion() && request.auth.uid == uid && esCuentaInicial()
+        && resource.data.rol == 'Dirección'
+        && request.resource.data.rol == 'Administrador principal'
+        && cambia(['rol']);
+      allow create: if principal() && rolAsignable(request.resource.data.rol);
+      allow update: if principal() && request.auth.uid != uid
+        && resource.data.rol != 'Administrador principal'
+        && rolAsignable(request.resource.data.rol)
+        && request.resource.data.usuario == resource.data.usuario;
       allow delete: if false;
     }
 
+    // Trabajos y fallas
     match /registros/{id} {
       allow read: if activo();
       allow create: if activo()
         && maquinaValida(request.resource.data.equipo)
-        && (admin() || (
-              request.resource.data.tecnicoUid == request.auth.uid
+        && (gestor() || (
+              rol() in ['Mecánico', 'Operador']
+              && request.resource.data.tecnicoUid == request.auth.uid
               && request.resource.data.tecnico == miPerfil().data.nombre
               && request.resource.data.creadoEn == request.time
               && (rol() != 'Operador' || request.resource.data.tipo == 'Reporte de falla')
               && (request.resource.data.tipo != 'Reporte de falla' || request.resource.data.estado == 'Pendiente')));
-      allow update: if admin()
+      allow update: if gestor()
         || (mecanico() && resource.data.tipo == 'Reporte de falla'
             && resource.data.estado in ['Pendiente', 'Abierta']
             && request.resource.data.estado == 'En atención'
@@ -49,7 +59,7 @@ service cloud.firestore {
             && request.resource.data.estado == 'Cerrada'
             && request.resource.data.finAtencion == request.time
             && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'fotosCierre', 'minutos']));
-      allow delete: if admin();
+      allow delete: if gestor();
     }
 
     match /fotos/{id} {
@@ -59,17 +69,17 @@ service cloud.firestore {
         && request.resource.data.data is string
         && request.resource.data.data.size() < 1000000;
       allow update: if false;
-      allow delete: if admin();
+      allow delete: if gestor();
     }
 
     match /programa/{id} {
       allow read: if activo();
-      allow write: if admin();
+      allow write: if gestor();
     }
 
     match /maquinas/{id} {
       allow read: if activo();
-      allow write: if admin() && maquinaValida(id);
+      allow write: if gestor() && maquinaValida(id);
     }
   }
 }

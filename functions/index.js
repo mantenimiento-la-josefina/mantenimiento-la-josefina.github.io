@@ -1,6 +1,7 @@
 // Servidor de Mantenimiento La Josefina DPC (Cloud Functions de Firebase)
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions, logger } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -72,19 +73,43 @@ function mensaje(titulo, cuerpo, url, tag) {
 exports.avisarFalla = onDocumentCreated('registros/{id}', async (event) => {
   const r = event.data && event.data.data();
   if (!r || r.tipo !== 'Reporte de falla') return;
-  const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '', nombre: '' };
+  const out = await avisar(r, event.params.id, 1);
+  logger.info('Aviso de falla', event.params.id, out);
+});
+
+async function destinosPara(equipo) {
   const tokSnap = await db.collection('tokens').get();
   const porUid = {};
   tokSnap.forEach(d => { const t = d.data(); if (t.uid) (porUid[t.uid] = porUid[t.uid] || []).push(d.id); });
   const destinos = [];
   for (const uid of Object.keys(porUid)) {
     const p = await perfilDe(uid);
-    if (leDebeLlegar(p, r.equipo)) destinos.push(...porUid[uid]);
+    if (leDebeLlegar(p, equipo)) destinos.push(...porUid[uid]);
   }
-  const titulo = '🚨 Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
+  return destinos;
+}
+async function avisar(r, id, n) {
+  const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '', nombre: '' };
+  const titulo = (n > 1 ? '🚨🚨 SIN ATENDER (' + n + '/' + MAX_AVISOS + ') ' : '🚨 ') + 'Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
   const cuerpo = (r.tipoFalla || 'Falla') + ' — ' + String(r.actividad || '').slice(0, 140) + ' · Reportó ' + (r.tecnico || '');
-  const out = await enviar(destinos, mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + event.params.id));
-  logger.info('Aviso de falla', event.params.id, out);
+  return enviar(await destinosPara(r.equipo), mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + id + '-' + n));
+}
+
+// 1b) Mientras la falla siga sin atender, el aviso se repite cada minuto (máximo 10 veces)
+const MAX_AVISOS = 10;
+exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 'America/Mexico_City' }, async () => {
+  const snap = await db.collection('registros').where('tipo', '==', 'Reporte de falla').get();
+  const ahora = Date.now();
+  for (const d of snap.docs) {
+    const r = d.data();
+    if (!['Pendiente', 'Abierta'].includes(r.estado)) continue;
+    const creado = r.creadoEn && r.creadoEn.toMillis ? r.creadoEn.toMillis() : 0;
+    const n = r.avisos || 1;
+    if (!creado || n >= MAX_AVISOS || ahora - creado < 50000 || ahora - creado > (MAX_AVISOS + 2) * 60000) continue;
+    await d.ref.update({ avisos: n + 1 });
+    const out = await avisar(r, d.id, n + 1);
+    logger.info('Aviso repetido', d.id, n + 1, out);
+  }
 });
 
 // 2) Cuenta desactivada/activada en el panel → se bloquea o desbloquea el acceso en el sistema de autenticación

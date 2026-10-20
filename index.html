@@ -155,6 +155,16 @@ body.modo-pantalla .wrap{max-width:none}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:10px;font-weight:600;box-shadow:0 6px 24px #0004;z-index:40;max-width:calc(100% - 32px)}
 @media(max-width:550px){header h1{font-size:21px}.card{padding:16px}.kpi h2{font-size:26px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+#alarma{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:#b00020;color:#fff;animation:alarmaParpadeo 1s steps(2) infinite}
+#alarma[hidden]{display:none}
+@keyframes alarmaParpadeo{50%{background:#5c0010}}
+#alarma .caja{max-width:420px;width:100%;text-align:center}
+#alarma h2{font-size:34px;margin:0 0 6px;color:#fff}
+#alarma .zona{font-size:22px;font-weight:700;margin:6px 0}
+#alarma p{margin:6px 0;font-size:17px;color:#fff}
+#alarma button{display:block;width:100%;margin-top:14px;padding:18px;font-size:20px;font-weight:700;border-radius:14px;border:0}
+#alarma .atender{background:#fff;color:#b00020}
+#alarma .callar{background:transparent;color:#fff;border:2px solid #fff}
 </style>
 </head>
 <body>
@@ -167,6 +177,7 @@ body.modo-pantalla .wrap{max-width:none}
 <footer>Mantenimiento La Josefina DPC · Sistema digital de mantenimiento · 2026</footer>
 <div id="visor" hidden></div>
 <div class="toast" id="toast" hidden></div>
+<div id="alarma" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -344,7 +355,7 @@ function suscribir(){
   subs.push(db.collection('registros').onSnapshot(s=>{
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
     if(!primeraCarga&&atiende()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
-    primeraCarga=false;pintarBanner();render()},err));
+    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(atiende()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
@@ -426,10 +437,20 @@ document.addEventListener('input',e=>{if(e.target.closest('#app form'))$('app').
 function desbloquearAudio(){try{if(!audioCtx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;audioCtx=new C()}if(audioCtx.state==='suspended')audioCtx.resume();
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();g.gain.value=0.0001;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.05);sonidoOn=true}catch(e){}}
 function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultimoSonido=Date.now();
-  try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
-    for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3)}}catch(e){}
-  try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}}
-function nuevaFalla(r){sirena();const m=maq(r.equipo);toast('🚨 Nueva falla en '+(m?m.zona:r.equipo)+': '+(r.tipoFalla||'')) ;parpadearTitulo()}
+  try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='sawtooth';for(let i=0;i<5;i++){o.frequency.setValueAtTime(650,t0+i*0.5);o.frequency.linearRampToValueAtTime(1500,t0+i*0.5+0.45)}
+    g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(0.9,t0+0.05);g.gain.setValueAtTime(0.9,t0+2.4);g.gain.exponentialRampToValueAtTime(0.0001,t0+2.5);
+    o.connect(g);g.connect(audioCtx.destination);o.start(t0);o.stop(t0+2.5)}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([600,200,600,200,600])}catch(e){}}
+function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c))}
+function abrirAlarma(){if(!perfil||!atiende()||Date.now()<silencioHasta)return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
+  const r=pend[0],m=maq(r.equipo),a=$('alarma');
+  a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<button class="atender" data-atender="${esc(r.id)}">Atender falla</button><button class="callar" id="silenciar">Silenciar 5 min</button></div>`;
+  a.hidden=false;sirena();
+  if(!abrirAlarma._i)abrirAlarma._i=setInterval(()=>{if(!misPendientes().length||Date.now()<silencioHasta)return cerrarAlarma();sirena()},3000)}
+function cerrarAlarma(){clearInterval(abrirAlarma._i);abrirAlarma._i=null;const a=$('alarma');if(a){a.hidden=true;a.innerHTML=''}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&misPendientes().length)abrirAlarma()});
+function nuevaFalla(r){abrirAlarma();const m=maq(r.equipo);toast('🚨 Nueva falla en '+(m?m.zona:r.equipo)+': '+(r.tipoFalla||'')) ;parpadearTitulo()}
 function parpadearTitulo(){if(parpadearTitulo._i)return;let on=false;const orig='Mantenimiento La Josefina DPC';parpadearTitulo._i=setInterval(()=>{const n=REG.filter(fallaPendiente).length;if(!n){clearInterval(parpadearTitulo._i);parpadearTitulo._i=null;document.title=orig;return}on=!on;document.title=on?'🚨 ('+n+') FALLA PENDIENTE':orig},1000)}
 function pintarBanner(){const b=$('banner');if(!b)return;
   if(!perfil||!atiende()||vista==='pantalla'){b.innerHTML='';return}
@@ -787,17 +808,17 @@ async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';
 document.addEventListener('click',async e=>{
   if(!sonidoOn&&perfil&&atiende()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
   const b=e.target.closest('button');if(!b)return;
-  if(b.id==='salir'){await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
+  if(b.id==='salir'){cerrarAlarma();await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
   if(b.id==='activarPush'){activarPush(false);return}
   if(b.id==='probarPush'){b.disabled=true;try{const r=await llamar('probarNotificacion',{});toast(r&&r.enviados?'Notificación de prueba enviada. Bloquea el teléfono y espera unos segundos.':'No hay teléfonos registrados con tu cuenta. Toca «Activar notificaciones».')}catch(er){toast(errTxt(er))}b.disabled=false;return}
   if(b.id==='cerrarVisor'){$('visor').hidden=true;$('visor').innerHTML='';return}
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
-  if(b.id==='silenciar'){silencioHasta=Date.now()+5*60000;toast('Sonido silenciado 5 minutos.');pintarBanner();return}
+  if(b.id==='silenciar'){silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
   if(b.id==='miCuenta'){ir('cuenta');return}
   if(b.closest('#nav')&&b.dataset.v){ir(b.dataset.v);return}
   if(b.dataset.v2){ir(b.dataset.v2);return}
   if(b.dataset.fotos){verFotos(b.dataset.fotos.split(','));return}
-  if(b.dataset.atender){atender(b.dataset.atender,b);return}
+  if(b.dataset.atender){await atender(b.dataset.atender,b);if(!misPendientes().length)cerrarAlarma();else if(abrirAlarma._i)abrirAlarma();return}
   if(b.dataset.finalizar){finalizando=b.dataset.finalizar;render(true);const t=$('z_trab');if(t)t.focus();return}
   if(b.dataset.ficha){maqSel=b.dataset.ficha;ir('ficha');return}
   if(b.dataset.hist){maqSel=b.dataset.hist;render(true);return}

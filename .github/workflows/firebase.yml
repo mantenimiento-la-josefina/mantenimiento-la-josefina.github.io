@@ -33,7 +33,7 @@ jobs:
             echo "Intento $i falló, esperando 90 segundos"
             sleep 90
           done
-          grep -iE "error|denied|permission|enable|billing|propagat|failed" salida.txt | tail -15 | while IFS= read -r l; do echo "::error::$l"; done
+          sed "s/\x1b\[[0-9;]*m//g" salida.txt | grep -v "ensuring required API" | tail -25 | while IFS= read -r l; do echo "::error::$l"; done
           exit 1
       - name: Bloquear registro libre de cuentas
         if: steps.cred.outputs.ok == 'true' && hashFiles('herramientas/bloquear-registro.activo') != ''

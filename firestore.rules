@@ -7,15 +7,16 @@ service cloud.firestore {
     function rol() { return miPerfil().data.rol; }
     function principal() { return activo() && rol() == 'Administrador principal'; }
     function gestor() { return activo() && rol() in ['Administrador principal', 'Administrador']; }
+    function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia']; }
     function mecanico() { return activo() && rol() == 'Mecánico'; }
     function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
     function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Mecánico', 'Operador']; }
     function cambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
     function esCuentaInicial() { return request.auth.token.email == '1000@lajosefina-dpc.app'; }
 
-    // Cuentas: solo el Administrador principal crea, modifica, activa y desactiva usuarios
+    // Cuentas: Administración, Dirección y Gerencia dan de alta; solo el Administrador principal crea administradores y modifica cuentas
     match /usuarios/{uid} {
-      allow read: if principal() || (sesion() && request.auth.uid == uid);
+      allow read: if altas() || (sesion() && request.auth.uid == uid);
       // Configuración inicial (solo la cuenta 1000, una vez)
       allow create: if sesion() && request.auth.uid == uid && esCuentaInicial()
         && request.resource.data.rol in ['Dirección', 'Administrador principal']
@@ -26,6 +27,8 @@ service cloud.firestore {
         && request.resource.data.rol == 'Administrador principal'
         && cambia(['rol']);
       allow create: if principal() && rolAsignable(request.resource.data.rol);
+      allow create: if altas() && rolAsignable(request.resource.data.rol)
+        && request.resource.data.rol != 'Administrador';
       allow update: if principal() && request.auth.uid != uid
         && resource.data.rol != 'Administrador principal'
         && rolAsignable(request.resource.data.rol)

@@ -201,15 +201,15 @@ const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
   principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
-  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','pantalla','cuenta'],
-  supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','pantalla','cuenta'],
+  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
+  supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
   principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['pantalla','Pantalla de mantenimiento']],
-  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
-  supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
+  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
+  supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
@@ -320,7 +320,7 @@ function suscribir(){
     primeraCarga=false;pintarBanner();render()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
-  if(esPrincipal())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
+  if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
 }
 function entrar(){
   pintarSesion();
@@ -623,7 +623,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
   <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
-  <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></div>
+  <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></div>
   <div><label for="u_planta">Planta</label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Ambas líneas</option>${MAQUINAS.map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
@@ -635,9 +635,10 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
 V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().filter(u=>!q||[u.nombre,u.usuario,u.numEmpleado,u.rol].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.activo-a.activo)||ROLES_ASIGNABLES.indexOf(a.rol)-ROLES_ASIGNABLES.indexOf(b.rol)||String(a.nombre).localeCompare(b.nombre));
   const ed=usrEdit?USUARIOS.find(u=>u.uid===usrEdit):null;
   const cuenta=r=>USUARIOS.filter(u=>u.rol===r&&u.activo).length;
-  return `<h2>👥 Administración de usuarios</h2>
+  const prin=esPrincipal();
+  return `<h2>👥 ${prin?'Administración':'Alta'} de usuarios</h2>${prin?'':'<p class="aviso">Puedes dar de alta trabajadores. Para modificar, cambiar de puesto o desactivar una cuenta, pide apoyo al Administrador principal.</p>'}
   <div class="grid">${kpi(USUARIOS.filter(u=>u.activo).length,'Cuentas activas')}${kpi(cuenta('Mecánico'),'Mecánicos')}${kpi(cuenta('Operador'),'Operadores')}${kpi(cuenta('Dirección')+cuenta('Gerencia')+cuenta('Administrador'),'Dirección, gerencia y administradores')}</div>
-  ${ed?`<div class="card"><h2>Modificar usuario · ${esc(ed.nombre)}</h2>${formUsuario(ed)}
+  ${ed&&prin?`<div class="card"><h2>Modificar usuario · ${esc(ed.nombre)}</h2>${formUsuario(ed)}
     <div class="aviso" style="margin-top:16px"><b>Restablecer contraseña:</b> por seguridad, Firebase solo permite cambiar la contraseña de otra persona desde un servidor. Esta función se activa en la fase de notificaciones push (plan Blaze). Mientras tanto, el trabajador puede cambiarla en «Mi cuenta»; si la olvidó, desactiva esta cuenta y crea una nueva con otro usuario.</div></div>`
   :usrAlta?`<div class="card"><h2>Agregar usuario</h2>${formUsuario(null)}</div>`
   :`<div class="acciones" style="margin:0 0 16px"><button id="altaUsr" class="xl">+ Agregar usuario</button></div>`}
@@ -646,11 +647,11 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
   <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(u.rol)}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
   <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
-  <td>${prot||yo?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
+  <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
-  <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea y administra usuarios y asigna puestos.</div></div>
-  <div class="item"><div><span class="tag bad">Administrador</span> Acceso completo a trabajos, máquinas, calendario e indicadores. No administra usuarios.</div></div>
-  <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Consultan trabajos abiertos y registrados, historiales e indicadores. No modifican registros ni usuarios.</div></div>
+  <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea administradores y modifica, cambia de puesto, activa o desactiva cuentas.</div></div>
+  <div class="item"><div><span class="tag bad">Administrador</span> Acceso completo a trabajos, máquinas, calendario e indicadores. Puede dar de alta usuarios (excepto administradores).</div></div>
+  <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Consultan trabajos abiertos y registrados, historiales e indicadores. Pueden dar de alta usuarios (excepto administradores). No modifican registros.</div></div>
   <div class="item"><div><span class="tag warn">Mecánico</span> Alertas de fallas en tiempo real, atender y finalizar fallas, registrar reparaciones, historiales técnicos.</div></div>
   <div class="item"><div><span class="tag">Operador</span> Reportar fallas y consultar ajustes y reparaciones anteriores.</div></div>
   <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia 1100–1999 · Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
@@ -768,6 +769,7 @@ document.addEventListener('click',async e=>{
   if(b.dataset.calmaq){calMaq=b.dataset.calmaq;render(true);return}
   if(b.dataset.indmaq){indMaq=b.dataset.indmaq;render(true);return}
   if(b.dataset.dia){diaSel=b.dataset.dia;render(true);return}
+  if(b.id==='altaUsr'){usrAlta=true;usrEdit=null;render(true);return}
   if(!esAdmin())return;
   if(b.dataset.cerrar){const r=REG.find(x=>x.id===b.dataset.cerrar);if(!r)return;
     try{await db.collection('registros').doc(r.id).update(esFalla(r)?{estado:'Cerrada',fechaCierre:hoy(),cerradoPor:perfil.nombre,finAtencion:TS()}:{estado:'Completado',fechaCierre:hoy(),cerradoPor:perfil.nombre});toast(esFalla(r)?'Falla cerrada.':'Marcado como completado.')}catch(er){toast(errTxt(er))}return}
@@ -776,7 +778,6 @@ document.addEventListener('click',async e=>{
     if(b.dataset.ok!=='1'){b.dataset.ok='1';const t=b.textContent;b.textContent='¿Confirmar?';setTimeout(()=>{if(b.isConnected){b.dataset.ok='';b.textContent=t}},4000);return}
     try{if(b.dataset.borrar){await db.collection('registros').doc(b.dataset.borrar).delete();toast('Registro eliminado.')}else{await db.collection('programa').doc(b.dataset.borrarprog).delete();toast('Programa eliminado.')}}catch(er){toast(errTxt(er))}return}
   if(b.dataset.realizar){const p=PROG.find(x=>x.id===b.dataset.realizar);if(!p)return;prefill={progId:p.id,equipo:p.equipo,fecha:p.fecha<=hoy()?hoy():p.fecha,actividad:p.actividad,tecnico:p.responsable||perfil.nombre,tipo:'Preventivo'};ir('registrar',true);return}
-  if(b.id==='altaUsr'){usrAlta=true;usrEdit=null;render(true);return}
   if(b.dataset.editusr){usrEdit=b.dataset.editusr;usrAlta=false;render(true);window.scrollTo({top:0});return}
   if(b.dataset.activo){const u=USUARIOS.find(x=>x.uid===b.dataset.activo);if(!u)return;try{await db.collection('usuarios').doc(u.uid).update({activo:!u.activo});toast(u.activo?'Cuenta desactivada.':'Cuenta activada.')}catch(er){toast(errTxt(er))}return}
 });

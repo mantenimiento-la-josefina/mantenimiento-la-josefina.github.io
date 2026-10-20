@@ -286,6 +286,13 @@ function pantallaLogin(){
 }
 function pantallaSinAcceso(extra){
   ocultarSesion();
+  if(usuario&&!perfil&&usuario.email===correoDe(USUARIO_INICIAL)){
+    $('app').innerHTML=`<div class="login"><div class="card"><h2>Terminar configuración inicial</h2><p>Tu cuenta ${USUARIO_INICIAL} ya existe, pero falta registrarla como Dirección.</p>
+    <form id="fFin"><label for="fin_nom">Nombre completo</label><input id="fin_nom" required maxlength="80"><div class="acciones"><button type="submit">Terminar configuración</button><button type="button" class="sec" id="salir">Cerrar sesión</button></div><div id="finErr"></div></form></div></div>`;
+    $('fFin').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;$('finErr').innerHTML='';
+      try{await db.collection('usuarios').doc(usuario.uid).set({nombre:$('fin_nom').value.trim(),usuario:USUARIO_INICIAL,rol:'Dirección',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()})}
+      catch(er){$('finErr').innerHTML=`<p class="error">${er&&er.code==='permission-denied'?'Firebase rechazó el registro: revisa que en Firestore → Reglas estén publicadas las reglas que dicen 1000@lajosefina-dpc.app.':esc(errTxt(er))}</p>`;b.disabled=false}};
+    return}
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Cuenta sin acceso</h2><p>Tu cuenta no está activa en el sistema. Pide a Dirección o Gerencia que la active.</p>${extra?`<p class="error">${esc(extra)}</p>`:''}<div class="acciones"><button id="salir">Cerrar sesión</button></div></div></div>`;
 }
 

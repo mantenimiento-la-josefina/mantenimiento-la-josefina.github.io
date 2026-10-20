@@ -10,6 +10,6 @@ jobs:
         run: |
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" -q
-          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="crearusuario" AND (severity>=WARNING OR httpRequest.status>=400)' --project mantenimiento-la-josefina --freshness=2h --limit=9 --format='value(timestamp,severity,httpRequest.status,textPayload,jsonPayload.message)' > out.txt 2>&1 || true
+          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="crearusuario" AND timestamp>="2026-10-20T22:19:30Z"' --project mantenimiento-la-josefina --freshness=2h --limit=9 --order=desc --format='value(timestamp,severity,httpRequest.status,textPayload,jsonPayload.message)' > out.txt 2>&1 || true
           sed 's/\t/ | /g' out.txt | head -9 | while IFS= read -r l; do echo "::error::$l"; done
           rm -f "$RUNNER_TEMP/sa.json"

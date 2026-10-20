@@ -1,0 +1,18 @@
+name: Falla de prueba
+on: workflow_dispatch
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Crear falla de prueba
+        env: { SA: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' }
+        working-directory: herramientas
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npm ci --no-audit --no-fund
+          node falla-prueba.js
+          rm -f "$RUNNER_TEMP/sa.json"

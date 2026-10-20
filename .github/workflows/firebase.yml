@@ -1,0 +1,36 @@
+name: Instalar servidor y reglas en Firebase
+on:
+  push:
+    branches: [main]
+    paths: ['functions/**', 'firestore.rules', 'firebase.json', 'herramientas/**', '.github/workflows/firebase.yml']
+  workflow_dispatch:
+concurrency: { group: firebase, cancel-in-progress: false }
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Credenciales de Firebase
+        id: cred
+        env: { SA: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' }
+        run: |
+          if [ -z "$SA" ]; then echo "Falta el secreto FIREBASE_SERVICE_ACCOUNT"; echo "ok=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+      - name: Instalar dependencias
+        if: steps.cred.outputs.ok == 'true'
+        run: npm ci --no-audit --no-fund
+        working-directory: functions
+      - name: Publicar reglas de seguridad y servidor
+        if: steps.cred.outputs.ok == 'true'
+        run: npx --yes firebase-tools@15.30.0 deploy --only firestore:rules,functions --project mantenimiento-la-josefina --non-interactive --force
+      - name: Bloquear registro libre de cuentas
+        if: steps.cred.outputs.ok == 'true' && hashFiles('herramientas/bloquear-registro.activo') != ''
+        run: npm ci --no-audit --no-fund && node bloquear-registro.js
+        working-directory: herramientas
+      - name: Borrar credenciales
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

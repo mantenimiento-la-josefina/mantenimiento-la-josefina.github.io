@@ -1,0 +1,13 @@
+{
+  "name": "Mantenimiento La Josefina DPC",
+  "short_name": "Mantenimiento DPC",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#8f1734",
+  "theme_color": "#8f1734",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

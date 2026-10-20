@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Mantenimiento DPC">
 <meta name="theme-color" content="#8f1734">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-180.png">
 <title>Mantenimiento La Josefina DPC</title>
 <style>
 /* Layout: banda guinda de encabezado + columna central de tarjetas */
@@ -169,6 +171,8 @@ body.modo-pantalla .wrap{max-width:none}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 // ===== Configuración =====
@@ -181,6 +185,8 @@ const FIREBASE_CONFIG = {
   appId: "1:1024154810561:web:2273253427bfc622613c40"
 };
 const URL_BASE = 'https://mantenimiento-la-josefina.github.io/';
+const VAPID_KEY = ''; // clave pública de notificaciones web (Firebase → Cloud Messaging)
+const SERVIDOR_LISTO = false; // se activa cuando el servidor (Cloud Functions) quedó instalado
 const DOMINIO = 'lajosefina-dpc.app'; // se entra con número de empleado; internamente es numero@DOMINIO
 const USUARIO_INICIAL = '1000';
 const MAQUINAS = [
@@ -274,7 +280,27 @@ function errTxt(e){const c=(e&&e.code)||'';
   if(c==='permission-denied')return 'No tienes permiso para esta acción.';
   if(c==='auth/requires-recent-login')return 'Por seguridad, cierra sesión, vuelve a entrar y repite el cambio.';
   if(c==='tomada')return 'Otro mecánico ya tomó esta falla.';
+  if(String(c).startsWith('functions/'))return (e.message&&e.message!=='INTERNAL'?e.message:'El servidor no respondió. Inténtalo de nuevo en un momento.');
   return 'Ocurrió un error ('+(c||(e&&e.message)||'desconocido')+').'}
+function llamar(nombre,datos){return fb.app().functions('us-central1').httpsCallable(nombre)(datos).then(r=>r.data)}
+// ===== Notificaciones push (teléfono bloqueado) =====
+function esIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
+function enPantallaInicio(){return window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)}
+function pushSoportado(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window}
+function estadoPush(){if(!VAPID_KEY||!SERVIDOR_LISTO)return 'no-listo';if(!pushSoportado())return esIOS()&&!enPantallaInicio()?'ios-instalar':'no-soportado';if(Notification.permission==='denied')return 'bloqueado';if(Notification.permission==='granted'&&LS.get('push_uid','')===(usuario&&usuario.uid))return 'activo';return 'pendiente'}
+async function activarPush(silencioso){
+  try{if(estadoPush()==='ios-instalar'){if(!silencioso)toast('En iPhone: Compartir → «Agregar a inicio», abre la app desde el ícono y vuelve a tocar «Activar notificaciones».');return false}
+    if(!pushSoportado()){if(!silencioso)toast('Este navegador no permite notificaciones. Usa Chrome (Android) o Safari (iPhone desde la pantalla de inicio).');return false}
+    const perm=Notification.permission==='granted'?'granted':(silencioso?Notification.permission:await Notification.requestPermission());
+    if(perm!=='granted'){if(!silencioso)toast(perm==='denied'?'Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador para esta página.':'No se dio permiso para notificaciones.');pintarBanner();return false}
+    const reg=await navigator.serviceWorker.register('firebase-messaging-sw.js');await navigator.serviceWorker.ready;
+    const token=await fb.messaging().getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    if(!token)throw new Error('sin token');
+    await db.collection('tokens').doc(token).set({uid:usuario.uid,token,rol:perfil.rol,nombre:perfil.nombre,dispositivo:navigator.userAgent.slice(0,160),actualizado:TS()});
+    LS.set('push_uid',usuario.uid);LS.set('push_token',token);
+    if(!silencioso)toast('✅ Notificaciones activadas en este teléfono.');pintarBanner();if(vista==='cuenta')render(true);return true
+  }catch(e){console.warn(e);if(!silencioso)toast('No se pudieron activar las notificaciones ('+((e&&(e.code||e.message))||'error')+').');return false}}
+async function quitarPushDeEsteTelefono(){const t=LS.get('push_token','');LS.set('push_uid','');if(t&&db){try{await db.collection('tokens').doc(t).delete()}catch(e){}}}
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 // ===== Dirección (QR y enlaces) =====
@@ -325,6 +351,7 @@ function suscribir(){
 }
 function entrar(){
   pintarSesion();
+  if(atiende()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
   let v=inicioRol();
   if(destino){if(destino.maq)maqSel=destino.maq;if(vistasPermitidas().includes(destino.vista))v=destino.vista;else if(destino.vista&&destino.vista!=='ficha')toast('No tienes acceso a esa sección.');destino=null}
   ir(v);
@@ -408,6 +435,9 @@ function pintarBanner(){const b=$('banner');if(!b)return;
   if(!perfil||!atiende()||vista==='pantalla'){b.innerHTML='';return}
   const pend=REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
   let h='';
+  const ep=estadoPush();
+  if(ep==='pendiente')h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
+  if(ep==='ios-instalar')h+=`<div class="activar"><span>📲 Para recibir fallas con el iPhone bloqueado: toca Compartir → «Agregar a inicio» y abre la app desde ese ícono.</span></div>`;
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
   if(pend.length){const p=pend[0],m=maq(p.equipo);
     h+=`<div class="alerta pulso"><div><b>🚨 ${pend.length} falla${pend.length>1?'s':''} sin atender</b><br>${esc(m?m.zona:'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div>
@@ -640,7 +670,8 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   return `<h2>👥 ${prin?'Administración':'Alta'} de usuarios</h2>${prin?'':'<p class="aviso">Puedes dar de alta trabajadores. Para modificar, cambiar de puesto o desactivar una cuenta, pide apoyo al Administrador principal.</p>'}
   <div class="grid">${kpi(USUARIOS.filter(u=>u.activo).length,'Cuentas activas')}${kpi(cuenta('Mecánico'),'Mecánicos')}${kpi(cuenta('Operador'),'Operadores')}${kpi(cuenta('Dirección')+cuenta('Gerencia')+cuenta('Administrador'),'Dirección, gerencia y administradores')}</div>
   ${ed&&prin?`<div class="card"><h2>Modificar usuario · ${esc(ed.nombre)}</h2>${formUsuario(ed)}
-    <div class="aviso" style="margin-top:16px"><b>Restablecer contraseña:</b> por seguridad, Firebase solo permite cambiar la contraseña de otra persona desde un servidor. Esta función se activa en la fase de notificaciones push (plan Blaze). Mientras tanto, el trabajador puede cambiarla en «Mi cuenta»; si la olvidó, desactiva esta cuenta y crea una nueva con otro usuario.</div></div>`
+    ${SERVIDOR_LISTO?`<div class="card" style="box-shadow:none;border:1px solid var(--line);margin-top:16px"><h2>Restablecer contraseña</h2><form id="fReset" data-uid="${esc(ed.uid)}"><label for="r_pass">Nueva contraseña temporal (mín. 6)</label><input id="r_pass" required minlength="6" autocomplete="new-password"><div class="acciones"><button type="submit">Restablecer contraseña</button></div><div id="rErr"></div></form><p class="muted">Se cerrará la sesión del trabajador en todos sus dispositivos. Entrégale la nueva contraseña; puede cambiarla en «Mi cuenta».</p></div>`
+    :`<div class="aviso" style="margin-top:16px"><b>Restablecer contraseña:</b> se activa cuando termine la instalación del servidor. Mientras tanto, el trabajador puede cambiarla en «Mi cuenta».</div>`}</div>`
   :usrAlta?`<div class="card"><h2>Agregar usuario</h2>${formUsuario(null)}</div>`
   :`<div class="acciones" style="margin:0 0 16px"><button id="altaUsr" class="xl">+ Agregar usuario</button></div>`}
   <div class="card"><h2>Usuarios registrados (${USUARIOS.length})</h2><label for="u_buscar">Buscar</label><input id="u_buscar" value="${esc(usrFiltro)}" placeholder="Nombre, usuario, número o puesto">
@@ -657,6 +688,8 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="item"><div><span class="tag">Operador</span> Reportar fallas y consultar ajustes y reparaciones anteriores.</div></div>
   <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia 1100–1999 · Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
+  ${atiende()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
+    return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
   <div class="acciones"><button type="submit">Cambiar contraseña</button></div><div id="cErr"></div></form></div>`;
@@ -714,6 +747,7 @@ function enlazar(){
       diaSel=fe;calMes=new Date(aFecha(fe).getFullYear(),aFecha(fe).getMonth(),1);toast(veces>1?veces+' mantenimientos programados.':'Mantenimiento programado.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}};
   const fc=$('fCfg');if(fc)fc.onsubmit=async ev=>{ev.preventDefault();try{await db.collection('maquinas').doc(maqSel).set({frecuenciaDias:$('frec').value},{merge:true});toast('Frecuencia guardada.');render(true)}catch(e){toast(errTxt(e))}};
   const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML='<option value="todas">Todas las líneas de la planta</option>'+maquinasDe(pl.value).map(m=>`<option value="${m.id}">${esc(m.zona)}</option>`).join('')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
+  const fr=$('fReset');if(fr)fr.onsubmit=async ev=>{ev.preventDefault();const b=fr.querySelector('button');b.disabled=true;$('rErr').innerHTML='';try{await llamar('restablecerContrasena',{uid:fr.dataset.uid,contrasena:$('r_pass').value});toast('Contraseña restablecida.');$('r_pass').value=''}catch(e){$('rErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}b.disabled=false};
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
   const fpw=$('fPass');if(fpw)fpw.onsubmit=async ev=>{ev.preventDefault();$('cErr').innerHTML='';if($('c_pass').value!==$('c_pass2').value){$('cErr').innerHTML='<p class="error">Las contraseñas no coinciden.</p>';return}
@@ -737,9 +771,10 @@ async function guardarUsuario(ev){ev.preventDefault();const f=ev.target,b=f.quer
     if(uid){await db.collection('usuarios').doc(uid).update(Object.assign(datos,{modificadoPor:usuario.uid,modificadoEn:TS()}));usrEdit=null;toast('Datos de '+datos.nombre+' actualizados.');render(true);return}
     const u=$('u_user').value.trim().toLowerCase();
     if(!/^[a-z0-9._-]{2,40}$/.test(u)){$('uErr').innerHTML='<p class="error">El usuario debe tener de 2 a 40 caracteres: letras sin acento, números, punto, guion o guion bajo. Sin espacios.</p>';b.disabled=false;return}
-    const sec=fb.apps.find(a=>a.name==='altas')||fb.initializeApp(FIREBASE_CONFIG,'altas');
+    if(SERVIDOR_LISTO){await llamar('crearUsuario',Object.assign({},datos,{usuario:u,contrasena:$('u_pass').value}))}
+    else{const sec=fb.apps.find(a=>a.name==='altas')||fb.initializeApp(FIREBASE_CONFIG,'altas');
     const c=await sec.auth().createUserWithEmailAndPassword(correoDe(u),$('u_pass').value);const nuid=c.user.uid;await sec.auth().signOut();
-    await db.collection('usuarios').doc(nuid).set(Object.assign(datos,{usuario:u,creadoPor:usuario.uid,creadoEn:TS()}));
+    await db.collection('usuarios').doc(nuid).set(Object.assign(datos,{usuario:u,creadoPor:usuario.uid,creadoEn:TS()}));}
     usrAlta=false;toast('Usuario «'+u+'» creado para '+datos.nombre+'.');render(true)
   }catch(e){$('uErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}}
 async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';const ref=db.collection('registros').doc(id);
@@ -752,7 +787,9 @@ async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';
 document.addEventListener('click',async e=>{
   if(!sonidoOn&&perfil&&atiende()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
   const b=e.target.closest('button');if(!b)return;
-  if(b.id==='salir'){try{await auth.signOut()}catch(er){}return}
+  if(b.id==='salir'){await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
+  if(b.id==='activarPush'){activarPush(false);return}
+  if(b.id==='probarPush'){b.disabled=true;try{const r=await llamar('probarNotificacion',{});toast(r&&r.enviados?'Notificación de prueba enviada. Bloquea el teléfono y espera unos segundos.':'No hay teléfonos registrados con tu cuenta. Toca «Activar notificaciones».')}catch(er){toast(errTxt(er))}b.disabled=false;return}
   if(b.id==='cerrarVisor'){$('visor').hidden=true;$('visor').innerHTML='';return}
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
   if(b.id==='silenciar'){silencioHasta=Date.now()+5*60000;toast('Sonido silenciado 5 minutos.');pintarBanner();return}

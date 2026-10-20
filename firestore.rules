@@ -75,6 +75,12 @@ service cloud.firestore {
       allow delete: if gestor();
     }
 
+    // Teléfonos registrados para recibir notificaciones push
+    match /tokens/{t} {
+      allow read, delete: if sesion() && resource.data.uid == request.auth.uid;
+      allow create, update: if activo() && request.resource.data.uid == request.auth.uid && request.resource.data.token == t;
+    }
+
     match /programa/{id} {
       allow read: if activo();
       allow write: if gestor();

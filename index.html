@@ -156,7 +156,7 @@ body.modo-pantalla .wrap{max-width:none}
 </style>
 </head>
 <body>
-<header><div class="hin"><div><h1>🔧 Mantenimiento La Josefina DPC</h1><small>La Josefina DPC · Envasadoras verticales · Planta AM Pack</small></div><div class="sesion" id="sesion" hidden></div></div></header>
+<header><div class="hin"><div><h1>🔧 Mantenimiento La Josefina DPC</h1><small>La Josefina DPC · Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div><div class="sesion" id="sesion" hidden></div></div></header>
 <div class="wrap">
   <div id="banner"></div>
   <nav id="nav" hidden></nav>
@@ -192,7 +192,8 @@ const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Mecánico','O
 const ROLES_GESTION = [PRINCIPAL,'Administrador'];
 const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia'];
 const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
-const PLANTAS = ['AM Pack'];
+const PLANTAS = ['AM Pack','CIC','Ricaty','Flexi Pack'];
+function maquinasDe(pl){return MAQUINAS.filter(m=>m.planta===pl)}
 const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
 const PENDIENTES = ['Pendiente','Abierta'];
@@ -248,7 +249,7 @@ function esAdmin(){return activoP()&&ROLES_GESTION.includes(perfil.rol)} // pued
 function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)}
 function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
-function deMiLinea(r){const l=misLineas();return !l||l.includes(r.equipo)}
+function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
 function esMecanico(){return !!perfil&&perfil.rol==='Mecánico'}
 function atiende(){return esAdmin()||esMecanico()}
 function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
@@ -499,13 +500,13 @@ V.alertas=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msC
   ${otras.length?`<h2>En atención por otros mecánicos</h2>${otras.map(r=>tarjetaFalla(r)).join('')}`:''}
   <div class="card"><h2>Atendidas hoy (${hoyCerr.length})</h2>${hoyCerr.length?hoyCerr.map(r=>{const t=tiempos(r);return `<div class="item"><div>${tagMaq(r.equipo)} <b>${esc(r.tipoFalla||'Falla')}</b><br><small class="muted">${esc(r.atendidoPor||r.cerradoPor||'')} · respuesta ${durMin(t.resp)} · reparación ${durMin(t.rep)}</small></div>${tagEstado(r.estado)}</div>`}).join(''):'<p class="muted">Ninguna todavía.</p>'}</div>`};
 V.pantalla=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
-  return `<div class="tabhead"><h1>🔧 Mantenimiento · AM Pack</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span>${sonidoOn?'':'<button id="activarAlertas">🔔 Activar sonido</button>'}<button class="sec" data-v2="${inicioRol()}">Salir de pantalla</button></div></div>
+  return `<div class="tabhead"><h1>🔧 Mantenimiento La Josefina DPC</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span>${sonidoOn?'':'<button id="activarAlertas">🔔 Activar sonido</button>'}<button class="sec" data-v2="${inicioRol()}">Salir de pantalla</button></div></div>
   <div class="grid" style="margin-bottom:18px">${MAQUINAS.map(m=>{const e=estadoMaq(m.id);return `<div class="card kpi"><h2>${esc(m.zona)}</h2><span class="tag ${e.cls}" style="font-size:15px">${esc(e.txt)}</span></div>`}).join('')}${kpi(pend.length,'Sin atender')}${kpi(aten.length,'En atención')}</div>
   <div class="tablero"><div><h2>🚨 Sin atender</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0;font-size:18px">Sin fallas pendientes ✅</p></div>'}</div>
   <div><h2>🛠️ En atención</h2>${aten.length?aten.map(r=>tarjetaFalla(r)).join(''):'<div class="card"><p class="muted" style="margin:0;font-size:18px">Ninguna en este momento.</p></div>'}</div></div>`};
-V.maquinas=()=>`<h2>Máquinas · Planta AM Pack</h2><div class="grid2">${MAQUINAS.map(m=>{const e=estadoMaq(m.id),r=registros(m.id),ult=r[0];return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.id)} · ${esc(m.nombre)}</h2><p style="margin:0">${tagMaq(m.id)} <span class="tag">${esc(m.planta)}</span></p>
+V.maquinas=()=>PLANTAS.map(pl=>{const ms_=maquinasDe(pl);return `<h2>Planta ${esc(pl)}</h2>`+(ms_.length?`<div class="grid2">${ms_.map(m=>{const e=estadoMaq(m.id),r=registros(m.id),ult=r[0];return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.id)} · ${esc(m.nombre)}</h2><p style="margin:0">${tagMaq(m.id)} <span class="tag">${esc(m.planta)}</span></p>
   <dl class="dl"><dt>Estado actual</dt><dd><span class="tag ${e.cls}">${esc(e.txt)}</span></dd><dt>Último trabajo</dt><dd>${ult?fmt(ult.fecha)+' · '+esc(ult.tipo):'Sin registros'}</dd></dl>
-  <div class="acciones"><button data-ficha="${m.id}">Ver ficha e historial</button></div></div>`}).join('')}</div>`;
+  <div class="acciones"><button data-ficha="${m.id}">Ver ficha e historial</button></div></div>`}).join('')}</div>`:`<div class="card"><p class="muted" style="margin:0">Todavía no hay líneas registradas en esta planta.</p></div>`)}).join('');
 V.ficha=()=>{
   const m=maq(maqSel),regs=registros(m.id),p=proximo(m.id),c=MAQCFG[m.id]||{},e=estadoMaq(m.id);
   const ult=regs.find(r=>r.tipo==='Preventivo'&&r.estado==='Completado');
@@ -617,7 +618,7 @@ V.indicadores=()=>{
   <p class="muted">Los tiempos se calculan con la hora del reporte, la hora en que un mecánico presiona «Atender falla» y la hora en que presiona «Finalizar trabajo». Las fallas registradas antes de esta versión no tienen esos tiempos.</p>`;
 };
 function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.numEmpleado||u.usuario)));for(let n=r[0]+1;n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
-function nombreLinea(l){if(!l||l==='todas')return 'Ambas líneas';const m=maq(l);return m?m.zona:l}
+function nombreLinea(l){if(!l||l==='todas')return 'Todas las líneas';const m=maq(l);return m?m.zona:l}
 let usrEdit=null, usrAlta=false, usrFiltro='';
 function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],linea:'todas',activo:true};
   return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
@@ -625,7 +626,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
   <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></div>
   <div><label for="u_planta">Planta</label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
-  <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Ambas líneas</option>${MAQUINAS.map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
+  <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Todas las líneas de la planta</option>${maquinasDe(u.planta||PLANTAS[0]).map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
   ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>
   <div><label for="u_pass">Contraseña inicial (mín. 6)</label><input id="u_pass" required minlength="6" autocomplete="new-password"></div></div>
@@ -712,7 +713,7 @@ function enlazar(){
     try{const batch=db.batch();for(let i=0;i<veces;i++)batch.set(db.collection('programa').doc(),{equipo:$('p_maq').value,fecha:sumarDias(fe,rep*i),actividad:$('p_act').value.trim(),responsable:$('p_resp').value.trim(),estado:'Programado',creadoEn:TS()});await batch.commit();
       diaSel=fe;calMes=new Date(aFecha(fe).getFullYear(),aFecha(fe).getMonth(),1);toast(veces>1?veces+' mantenimientos programados.':'Mantenimiento programado.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}};
   const fc=$('fCfg');if(fc)fc.onsubmit=async ev=>{ev.preventDefault();try{await db.collection('maquinas').doc(maqSel).set({frecuenciaDias:$('frec').value},{merge:true});toast('Frecuencia guardada.');render(true)}catch(e){toast(errTxt(e))}};
-  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
+  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML='<option value="todas">Todas las líneas de la planta</option>'+maquinasDe(pl.value).map(m=>`<option value="${m.id}">${esc(m.zona)}</option>`).join('')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
   const fpw=$('fPass');if(fpw)fpw.onsubmit=async ev=>{ev.preventDefault();$('cErr').innerHTML='';if($('c_pass').value!==$('c_pass2').value){$('cErr').innerHTML='<p class="error">Las contraseñas no coinciden.</p>';return}

@@ -2,12 +2,15 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions, logger } = require('firebase-functions/v2');
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getMessaging } = require('firebase-admin/messaging');
 
-admin.initializeApp();
+initializeApp();
 setGlobalOptions({ region: 'us-central1', maxInstances: 5 });
 
-const db = admin.firestore();
+const db = getFirestore();
 const URL_BASE = 'https://mantenimiento-la-josefina.github.io/';
 const DOMINIO = 'lajosefina-dpc.app';
 const PRINCIPAL = 'Administrador principal';
@@ -41,7 +44,7 @@ function leDebeLlegar(perfil, equipo) {
 // Envía los avisos push a los teléfonos indicados y limpia los tokens vencidos
 async function enviar(tokens, msg) {
   if (!tokens.length) return { enviados: 0 };
-  const res = await admin.messaging().sendEach(tokens.map(t => Object.assign({ token: t }, msg)));
+  const res = await getMessaging().sendEach(tokens.map(t => Object.assign({ token: t }, msg)));
   const borrar = [];
   res.responses.forEach((r, i) => {
     if (!r.success) {
@@ -89,9 +92,9 @@ exports.sincronizarCuenta = onDocumentUpdated('usuarios/{uid}', async (event) =>
   const antes = event.data.before.data() || {}, despues = event.data.after.data() || {};
   if (antes.activo === despues.activo) return;
   const uid = event.params.uid;
-  await admin.auth().updateUser(uid, { disabled: despues.activo !== true });
+  await getAuth().updateUser(uid, { disabled: despues.activo !== true });
   if (despues.activo !== true) {
-    await admin.auth().revokeRefreshTokens(uid);
+    await getAuth().revokeRefreshTokens(uid);
     const t = await db.collection('tokens').where('uid', '==', uid).get();
     await Promise.all(t.docs.map(d => d.ref.delete()));
   }
@@ -110,7 +113,7 @@ exports.crearUsuario = onCall(async (req) => {
   if (d.numEmpleado && !/^[0-9]{1,10}$/.test(String(d.numEmpleado))) throw new HttpsError('invalid-argument', 'Número de empleado no válido.');
   let nuevo;
   try {
-    nuevo = await admin.auth().createUser({ email: usuario + '@' + DOMINIO, password: String(d.contrasena), displayName: String(d.nombre || '').slice(0, 80), disabled: d.activo === false });
+    nuevo = await getAuth().createUser({ email: usuario + '@' + DOMINIO, password: String(d.contrasena), displayName: String(d.nombre || '').slice(0, 80), disabled: d.activo === false });
   } catch (e) {
     if (e.code === 'auth/email-already-exists') throw new HttpsError('already-exists', 'Ese nombre de usuario ya está ocupado. Elige otro.');
     throw new HttpsError('internal', 'No se pudo crear la cuenta.');
@@ -118,7 +121,7 @@ exports.crearUsuario = onCall(async (req) => {
   await db.doc('usuarios/' + nuevo.uid).set({
     nombre: String(d.nombre || '').trim().slice(0, 80), usuario, numEmpleado: String(d.numEmpleado || ''), rol,
     planta: String(d.planta || ''), linea: String(d.linea || 'todas'), activo: d.activo !== false,
-    creadoPor: req.auth.uid, creadoEn: admin.firestore.FieldValue.serverTimestamp(),
+    creadoPor: req.auth.uid, creadoEn: FieldValue.serverTimestamp(),
   });
   return { uid: nuevo.uid };
 });
@@ -131,9 +134,9 @@ exports.restablecerContrasena = onCall(async (req) => {
   const p = await perfilDe(uid);
   if (!p) throw new HttpsError('not-found', 'No existe ese usuario.');
   if (p.rol === PRINCIPAL) throw new HttpsError('permission-denied', 'Cambia tu propia contraseña en «Mi cuenta».');
-  await admin.auth().updateUser(uid, { password: pass });
-  await admin.auth().revokeRefreshTokens(uid);
-  await db.doc('usuarios/' + uid).update({ contrasenaRestablecidaEn: admin.firestore.FieldValue.serverTimestamp(), contrasenaRestablecidaPor: req.auth.uid });
+  await getAuth().updateUser(uid, { password: pass });
+  await getAuth().revokeRefreshTokens(uid);
+  await db.doc('usuarios/' + uid).update({ contrasenaRestablecidaEn: FieldValue.serverTimestamp(), contrasenaRestablecidaPor: req.auth.uid });
   return { ok: true };
 });
 

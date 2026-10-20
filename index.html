@@ -441,11 +441,9 @@ document.addEventListener('input',e=>{if(e.target.closest('#app form'))$('app').
 function desbloquearAudio(){try{if(!audioCtx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;audioCtx=new C()}if(audioCtx.state==='suspended')audioCtx.resume();
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();g.gain.value=0.0001;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.05);sonidoOn=true}catch(e){}}
 function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultimoSonido=Date.now();
-  try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();
-    o.type='sawtooth';for(let i=0;i<5;i++){o.frequency.setValueAtTime(650,t0+i*0.5);o.frequency.linearRampToValueAtTime(1500,t0+i*0.5+0.45)}
-    g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(0.9,t0+0.05);g.gain.setValueAtTime(0.9,t0+2.4);g.gain.exponentialRampToValueAtTime(0.0001,t0+2.5);
-    o.connect(g);g.connect(audioCtx.destination);o.start(t0);o.stop(t0+2.5)}catch(e){}
-  try{navigator.vibrate&&navigator.vibrate([600,200,600,200,600])}catch(e){}}
+  try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
+    for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3)}}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}}
 function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c))}
 function abrirAlarma(){if(!perfil||!insiste()||Date.now()<silencioHasta)return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
   const r=pend[0],m=maq(r.equipo),a=$('alarma');

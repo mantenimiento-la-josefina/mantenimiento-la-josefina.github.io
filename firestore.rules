@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function sesion() { return request.auth != null; }
+    function miPerfil() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
+    function activo() { return sesion() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && miPerfil().data.activo == true; }
+    function rol() { return miPerfil().data.rol; }
+    function admin() { return activo() && rol() in ['Dirección', 'Gerencia']; }
+    function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
+    function rolValido(r) { return r in ['Dirección', 'Gerencia', 'Mecánico', 'Operador']; }
+
+    // Trabajadores
+    match /usuarios/{uid} {
+      allow read: if admin() || (sesion() && request.auth.uid == uid);
+      // Primera cuenta de Dirección (configuración inicial)
+      allow create: if sesion() && request.auth.uid == uid
+        && request.auth.token.email == '1000@lajosefina-dpc.app'
+        && request.resource.data.rol == 'Dirección'
+        && request.resource.data.activo == true;
+      // Altas y cambios: solo Dirección y Gerencia; solo Dirección puede crear o tocar cuentas de Dirección
+      allow create: if admin() && rolValido(request.resource.data.rol)
+        && (request.resource.data.rol != 'Dirección' || rol() == 'Dirección');
+      allow update: if admin() && request.auth.uid != uid
+        && rolValido(request.resource.data.rol)
+        && (rol() == 'Dirección' || (resource.data.rol != 'Dirección' && request.resource.data.rol != 'Dirección'));
+      allow delete: if false;
+    }
+
+    // Trabajos de mantenimiento y reportes de fallas
+    match /registros/{id} {
+      allow read: if activo();
+      allow create: if activo()
+        && maquinaValida(request.resource.data.equipo)
+        && (admin() || (
+              request.resource.data.tecnicoUid == request.auth.uid
+              && request.resource.data.tecnico == miPerfil().data.nombre
+              && request.resource.data.creadoEn == request.time));
+      allow update, delete: if admin();
+    }
+
+    // Calendario preventivo
+    match /programa/{id} {
+      allow read: if activo();
+      allow write: if admin();
+    }
+
+    // Datos de cada máquina (frecuencia preventiva)
+    match /maquinas/{id} {
+      allow read: if activo();
+      allow write: if admin() && maquinaValida(id);
+    }
+  }
+}

@@ -220,14 +220,14 @@ const MAQUINAS = [
   {id:'AMP-LB-001',clave:'B',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea B'}
 ];
 const PRINCIPAL = 'Administrador principal';
-const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Coordinación','Supervisor de mantenimiento','Mecánico','Operador'];
-const ROLES_MANTTO = ['Mecánico','Supervisor de mantenimiento'];
-const ROLES_GESTION = [PRINCIPAL,'Administrador'];
-const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia','Coordinación'];
-const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Coordinación':[1100,1999],'Supervisor de mantenimiento':[2000,2999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
+const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Coordinación','Supervisor de mantenimiento','Mecánico','Ingeniero de procesos','Operador'];
+const ROLES_MANTTO = ['Mecánico'];
+const ROLES_GESTION = [PRINCIPAL,'Supervisor de mantenimiento']; // corrigen registros, calendario y configuración
+const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia']; // pueden dar de alta usuarios
+const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Coordinación':[1100,1999],'Ingeniero de procesos':[4000,4999],'Supervisor de mantenimiento':[2000,2999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
 const PLANTAS = ['AM Pack','CIC','Ricaty','Flexi Pack'];
 function maquinasDe(pl){return MAQUINAS.filter(m=>m.planta===pl)}
-const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Coordinación':'plan','Supervisor de mantenimiento':'warn','Mecánico':'warn','Operador':''};
+const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Coordinación':'plan','Ingeniero de procesos':'plan','Supervisor de mantenimiento':'warn','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
 const PENDIENTES = ['Pendiente','Abierta'];
 const EN_ATENCION = ['En atención','En proceso'];
@@ -235,22 +235,25 @@ const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
   principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','cuenta'],
-  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','cuenta'],
-  supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
-  coordinacion:['tablero','panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','cuenta'],
+  'Administrador':['usuarios','cuenta'],
+  direccion:['tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','cuenta'],
+  coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
+  'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
-  'Supervisor de mantenimiento':['alertas','maquinas','ficha','registrar','falla','historial','abiertos','indicadores','pantalla','cuenta'],
+  'Ingeniero de procesos':['tablero','falla','indicadores','ficha','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
   principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento']],
-  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento']],
-  supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
-  coordinacion:[['tablero','🟢 Tablero de producción'],['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios']],
+  'Administrador':[['usuarios','👥 Alta de usuarios']],
+  direccion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios']],
+  coordinacion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores']],
+  'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
-  'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['abiertos','Trabajos abiertos'],['historial','Historial'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
+  'Ingeniero de procesos':[['falla','🚨 Reportar falla'],['tablero','🟢 Tablero de producción'],['indicadores','Indicadores']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
+const INICIO = {principal:'panel','Administrador':'usuarios',direccion:'tablero',coordinacion:'tablero','Supervisor de mantenimiento':'alertas','Mecánico':'alertas','Ingeniero de procesos':'tablero','Operador':'falla'};
 
 // ===== Estado =====
 let auth=null, db=null, fb=null;
@@ -285,15 +288,19 @@ function esPrincipal(){return activoP()&&perfil.rol===PRINCIPAL}
 function esAdmin(){return activoP()&&ROLES_GESTION.includes(perfil.rol)} // puede modificar registros y configuración
 function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)}
 function esCoordinacion(){return activoP()&&perfil.rol==='Coordinación'}
-function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esCoordinacion()?'coordinacion':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
+function grupo(){if(!perfil)return '';if(esPrincipal())return 'principal';if(['Dirección','Gerencia'].includes(perfil.rol))return 'direccion';if(perfil.rol==='Coordinación')return 'coordinacion';return perfil.rol}
 const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r){return ROL_TXT[r]||r}
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
 function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
-function atiende(){return esAdmin()||esMecanico()}
+function atiende(){return esPrincipal()||esMecanico()}
+function avisa(){return activoP()&&perfil.rol==='Supervisor de mantenimiento'}
+function recibeEsc(){return activoP()&&['Supervisor de mantenimiento','Coordinación',PRINCIPAL].includes(perfil.rol)}
+function conAlertas(){return atiende()||avisa()||recibeEsc()}
+function puedeRegistrar(){return esPrincipal()||esMecanico()}
 function insiste(){return esMecanico()}
 function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
-function inicioRol(){return esCoordinacion()?'tablero':esSupervisor()?'panel':esMecanico()?'alertas':'falla'}
+function inicioRol(){return INICIO[grupo()]||'cuenta'}
 function correoDe(u){u=String(u||'').replace(/\s+/g,'').toLowerCase();return u+'@'+DOMINIO}
 function usuarioDe(correo){return String(correo||'').replace('@'+DOMINIO,'')}
 function ms(t){try{if(t&&t.toMillis)return t.toMillis()}catch(e){}return null}
@@ -364,6 +371,7 @@ function iniciar(){
     $('app').innerHTML='<div class="card"><p class="muted">Cargando tu cuenta…</p></div>';
     let listo=false,rolAntes=null;
     subs.push(db.collection('usuarios').doc(u.uid).onSnapshot(s=>{
+      if(!usuario||usuario.uid!==u.uid)return;
       perfil=s.exists?s.data():null;
       if(!perfil||perfil.activo!==true){cerrarSubs(true);listo=false;pantallaSinAcceso();return}
       if(!listo||rolAntes!==perfil.rol){cerrarSubs(true);listo=true;rolAntes=perfil.rol;suscribir();entrar()}else{pintarSesion();render()}
@@ -375,7 +383,9 @@ function suscribir(){
   const err=e=>{console.warn(e);toast(errTxt(e))};
   primeraCarga=true;
   subs.push(db.collection('registros').onSnapshot(s=>{
+    if(!usuario||!perfil)return;
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
+    if(!primeraCarga&&avisa()){const nv=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nv.length){sirenaSuave(true);const m=maq(nv[0].equipo);toast('🚨 Nueva falla en '+(m?m.zona:nv[0].equipo)+': '+(nv[0].tipoFalla||''));parpadearTitulo()}}
     if(!primeraCarga&&insiste()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
     const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;setTimeout(()=>procesarEscaneo(em),0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
@@ -384,7 +394,7 @@ function suscribir(){
 }
 function entrar(){
   pintarSesion();
-  if(atiende()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
+  if(conAlertas()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
   let v=inicioRol();
   if(destino&&destino.vista==='qr'&&insiste()){const d=destino;destino=null;maqSel=d.maq;escaneoPendiente=d.maq;ir('alertas');return}
   if(destino&&destino.vista==='qr'){const d=destino;destino=null;maqSel=d.maq;
@@ -449,13 +459,13 @@ function ir(v,keep){
 }
 function formOcupado(){const a=$('app');if(a.dataset.v!==vista)return false;if(a.dataset.sucio==='1')return true;const el=document.activeElement;return !!(el&&a.contains(el)&&el.closest('form'))}
 function render(forzar){
-  if(!perfil)return;
+  if(!perfil||!usuario)return;
   if(!vistasPermitidas().includes(vista))vista=inicioRol();
   if(!forzar&&formOcupado()){pendiente=true;return}
   pendiente=false;
   const a=$('app');a.innerHTML=V[vista]();a.dataset.v=vista;a.dataset.sucio='';
   marcarNav();enlazar();pintarBanner();
-  if(vista==='ficha'&&esSupervisor())pintarQR(maqSel,'qrbox');
+  if(vista==='ficha'&&esAdmin())pintarQR(maqSel,'qrbox');
 }
 document.addEventListener('input',e=>{if(e.target.closest('#app form'))$('app').dataset.sucio='1'});
 
@@ -500,20 +510,35 @@ function cerrarAlarma(){clearInterval(abrirAlarma._i);abrirAlarma._i=null;const 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&misPendientes().length)abrirAlarma()});
 function nuevaFalla(r){abrirAlarma();const m=maq(r.equipo);toast('🚨 Nueva falla en '+(m?m.zona:r.equipo)+': '+(r.tipoFalla||'')) ;parpadearTitulo()}
 function parpadearTitulo(){if(parpadearTitulo._i)return;let on=false;const orig='Mantenimiento La Josefina DPC';parpadearTitulo._i=setInterval(()=>{const n=REG.filter(fallaPendiente).length;if(!n){clearInterval(parpadearTitulo._i);parpadearTitulo._i=null;document.title=orig;return}on=!on;document.title=on?'🚨 ('+n+') FALLA PENDIENTE':orig},1000)}
-function pintarBanner(){const b=$('banner');if(!b)return;
-  if(!perfil||!atiende()||vista==='pantalla'){b.innerHTML='';return}
+let ENTERADO=new Set(LS.get('dpc_enterado',[])),ultimoSuave=0;
+const MIN_ESCALAR=10;
+function marcarEnterado(ids){ids.forEach(i=>ENTERADO.add(i));LS.set('dpc_enterado',[...ENTERADO].slice(-400));pintarBanner()}
+function pendSinEnterar(){return avisa()?misPendientes().filter(r=>!ENTERADO.has(r.id)):[]}
+function escaladas(){if(!recibeEsc())return [];return REG.filter(r=>fallaPendiente(r)&&deMiLinea(r)&&Date.now()-msCreado(r)>=MIN_ESCALAR*60000).sort((a,b)=>msCreado(a)-msCreado(b))}
+function escSinEnterar(){return escaladas().filter(r=>!ENTERADO.has(r.id+'-esc'))}
+function sirenaSuave(ya){if(!sonidoOn||!audioCtx)return;ultimoSuave=Date.now();
+  try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
+    for(let i=0;i<3;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.value=i%2?660:880;g.gain.setValueAtTime(0.0001,t0+i*0.4);g.gain.exponentialRampToValueAtTime(0.18,t0+i*0.4+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.4+0.34);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.4);o.stop(t0+i*0.4+0.36)}}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([250,120,250])}catch(e){}}
+function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTML='';return}
+  if(!perfil||!conAlertas()||vista==='pantalla'||vista==='tablero'&&tableroCompleto){b.innerHTML='';return}
   const pend=REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
   let h='';
   const ep=estadoPush();
-  if(ep==='pendiente'&&insiste())h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
+  if(ep==='pendiente'&&conAlertas())h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
   if(ep==='ios-instalar')h+=`<div class="activar"><span>📲 Para recibir fallas con el iPhone bloqueado: toca Compartir → «Agregar a inicio» y abre la app desde ese ícono.</span></div>`;
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
-  if(pend.length){const p=pend[0],m=maq(p.equipo);
-    h+=`<div class="alerta pulso"><div><b>🚨 ${pend.length} falla${pend.length>1?'s':''} sin atender</b><br>${esc(m?m.zona:'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div>
-    <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}${insiste()?'<button class="mini" id="abrirEscaner">📷 Escanear QR</button>':`<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button>`}</div></div>`}
+  const esc_=escSinEnterar();
+  if(esc_.length){const p=esc_[0],m=maq(p.equipo);h+=`<div class="alerta pulso" style="background:#8a1020"><div><b>⚠️ ${esc_.length} falla${esc_.length>1?'s llevan':' lleva'} más de ${MIN_ESCALAR} min sin que un mecánico la tome</b><br>${esc(m?(m.planta+' · '+m.zona):'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div><div class="acciones" style="margin:0"><button class="mini" id="enteradoEsc">Enterado</button></div></div>`}
+  if(pend.length&&(atiende()||avisa())){const p=pend[0],m=maq(p.equipo);
+    h+=`<div class="alerta ${avisa()&&!pendSinEnterar().length?'':'pulso'}"><div><b>🚨 ${pend.length} falla${pend.length>1?'s':''} sin atender</b><br>${esc(m?m.zona:'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div>
+    <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}${insiste()?'<button class="mini" id="abrirEscaner">📷 Escanear QR</button>':avisa()?(pendSinEnterar().length?'<button class="mini" id="enteradoSup">Enterado</button>':'<span>✓ Enterado</span>'):`<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button>`}</div></div>`}
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
-setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena()},1000);
+let escVistas=0;
+setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena();
+  if((pendSinEnterar().length||escSinEnterar().length)&&Date.now()-ultimoSuave>30000)sirenaSuave();
+  const ne=escSinEnterar().length;if(ne!==escVistas){escVistas=ne;pintarBanner()}},1000);
 async function pedirWakeLock(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
 function soltarWakeLock(){try{if(wakeLock){wakeLock.release();wakeLock=null}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(vista==='pantalla'||vista==='tablero'))pedirWakeLock()});
@@ -625,7 +650,7 @@ V.ficha=()=>{
   <dt>Próximo mantenimiento</dt><dd>${p?fmt(p.fecha)+(p.vencido?' <span class="tag bad">Vencido</span>':'')+`<br><small class="muted">${esc(p.txt)}</small>`:'Sin programar'}</dd>
   <dt>Trabajos abiertos</dt><dd>${regs.filter(abierto).length}</dd>
   <dt>Frecuencia preventiva</dt><dd>${c.frecuenciaDias?esc(c.frecuenciaDias)+' días':'Por definir'}</dd></dl>
-  <div class="acciones"><button data-irmaq="registrar">+ Registrar trabajo</button><button class="falla" data-irmaq="falla">Reportar falla</button>${esAdmin()?'<button class="sec" data-irmaq="calendario">Programar en calendario</button>':''}</div></div>
+  <div class="acciones">${puedeRegistrar()?'<button data-irmaq="registrar">+ Registrar trabajo</button>':''}${vistasPermitidas().includes('falla')?'<button class="falla" data-irmaq="falla">Reportar falla</button>':''}${esAdmin()?'<button class="sec" data-irmaq="calendario">Programar en calendario</button>':''}</div></div>
   <div class="card"><h2>Historial de mantenimiento · ${esc(m.zona)}</h2>${filas(regs,{sinMaq:true,acciones:true,vacio:'Todavía no hay trabajos registrados para esta máquina.'})}</div>
   ${esAdmin()?`<div class="card"><h2>Frecuencia del mantenimiento preventivo</h2><p class="muted">Se usa para calcular el siguiente preventivo cuando no hay uno programado en el calendario.</p>
   <form id="fCfg" class="dos"><div><label for="frec">Cada cuántos días</label><input id="frec" type="number" min="1" max="730" value="${esc(c.frecuenciaDias||'')}" placeholder="Ej. 30"></div><div style="display:flex;align-items:flex-end"><button type="submit" style="margin-top:12px">Guardar frecuencia</button></div></form></div>
@@ -648,7 +673,7 @@ function formMant(){
   <label for="m_obs">Observaciones</label><textarea id="m_obs" maxlength="2000">${esc(pf.observaciones||'')}</textarea>
   <div class="acciones"><button type="submit">${ed?'Guardar cambios':'Guardar registro'}</button>${ed?'<button type="button" class="sec" data-v2="trabajos">Cancelar</button>':''}</div><div id="fErr"></div></form></div>`;
 }
-V.registrar=formMant;
+V.registrar=()=>!editId&&!puedeRegistrar()?'<div class="card"><h2>Registrar trabajo</h2><p>Los trabajos los registran los mecánicos. Desde «Trabajos registrados» puedes corregir o cerrar un registro con el botón Editar.</p></div>':formMant();
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));
   return `<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
   ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
@@ -763,14 +788,16 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
   <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea administradores y modifica, cambia de puesto, activa o desactiva cuentas.</div></div>
-  <div class="item"><div><span class="tag bad">Administrador</span> Acceso completo a trabajos, máquinas, calendario e indicadores. Puede dar de alta usuarios (excepto administradores).</div></div>
-  <div class="item"><div><span class="tag plan">Dirección / Gerencia / Coordinación</span> Consultan trabajos abiertos y registrados, historiales e indicadores. Pueden dar de alta usuarios (excepto administradores). No modifican registros.</div></div>
-  <div class="item"><div><span class="tag warn">Supervisor de mantenimiento</span> Igual que Mecánico, más trabajos abiertos e indicadores. Recibe la alarma fuerte de fallas.</div></div>
-  <div class="item"><div><span class="tag warn">Mecánico</span> Alarma fuerte de fallas (se repite hasta atender), atender y finalizar fallas, registrar reparaciones, historiales técnicos.</div></div>
-  <div class="item"><div><span class="tag">Operador</span> Reportar fallas y consultar ajustes y reparaciones anteriores.</div></div>
-  <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Supervisores de mantenimiento y Mecánicos 2000–2999 · Operadores 3000–3999. Para la pantalla del área de mantenimiento, crea una cuenta con puesto «Mecánico».</p></div>`};
+  <div class="item"><div><span class="tag bad">Administrador</span> Solo da de alta usuarios (excepto administradores).</div></div>
+  <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Ven todo: tablero de producción, fallas en vivo, indicadores, trabajos registrados y abiertos. Dan de alta usuarios. No modifican registros.</div></div>
+  <div class="item"><div><span class="tag plan">Coordinación de Producción</span> Tablero de producción, fallas en vivo e indicadores. Aviso si una falla pasa ${MIN_ESCALAR} min sin atender.</div></div>
+  <div class="item"><div><span class="tag warn">Supervisor de mantenimiento</span> Fallas en vivo con aviso que se repite hasta tocar «Enterado», tablero, trabajos, historial, indicadores y calendario. Corrige y cierra registros. No reporta fallas ni registra trabajos.</div></div>
+  <div class="item"><div><span class="tag warn">Mecánico</span> Alarma que solo se apaga escaneando el QR de la máquina; al escanear toma la falla. Registra y finaliza trabajos.</div></div>
+  <div class="item"><div><span class="tag plan">Ingeniero de procesos</span> Reporta fallas, ve el tablero de producción y los indicadores.</div></div>
+  <div class="item"><div><span class="tag">Operador</span> Reporta fallas y consulta ajustes y reparaciones anteriores.</div></div>
+  <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Mantenimiento 2000–2999 · Operadores 3000–3999 · Ingenieros de procesos 4000–4999.</p></div>`};
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
-  ${insiste()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
+  ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
@@ -867,7 +894,7 @@ async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';
 
 // Clics
 document.addEventListener('click',async e=>{
-  if(!sonidoOn&&perfil&&insiste()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
+  if(!sonidoOn&&perfil&&conAlertas()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
   const b=e.target.closest('button');if(!b)return;
   if(b.id==='salir'){cerrarAlarma();await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
   if(b.id==='activarPush'){activarPush(false);return}
@@ -875,6 +902,8 @@ document.addEventListener('click',async e=>{
   if(b.id==='cerrarVisor'){$('visor').hidden=true;$('visor').innerHTML='';return}
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
   if(b.id==='abrirEscaner'){abrirEscaner();return}
+  if(b.id==='enteradoSup'){marcarEnterado(misPendientes().map(r=>r.id));toast('Enterado. Te avisaremos si llega otra falla.');return}
+  if(b.id==='enteradoEsc'){marcarEnterado(escaladas().map(r=>r.id+'-esc'));toast('Enterado.');return}
   if(b.id==='cerrarEscaner'){cerrarEscaner();return}
   if(b.id==='silenciar'){if(insiste())return;silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
   if(b.id==='tableroCompleto'){tableroCompleto=!tableroCompleto;document.body.classList.toggle('modo-pantalla',tableroCompleto);render(true);return}

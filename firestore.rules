@@ -6,11 +6,12 @@ service cloud.firestore {
     function activo() { return sesion() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && miPerfil().data.activo == true; }
     function rol() { return miPerfil().data.rol; }
     function principal() { return activo() && rol() == 'Administrador principal'; }
-    function gestor() { return activo() && rol() in ['Administrador principal', 'Administrador']; }
-    function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia', 'Coordinación']; }
-    function mecanico() { return activo() && rol() in ['Mecánico', 'Supervisor de mantenimiento']; }
+    // Corrigen y cierran registros, calendario y configuración de máquinas
+    function gestor() { return activo() && rol() in ['Administrador principal', 'Supervisor de mantenimiento']; }
+    function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia']; }
+    function mecanico() { return activo() && rol() == 'Mecánico'; }
     function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
-    function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Operador']; }
+    function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Ingeniero de procesos', 'Operador']; }
     function cambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
     function esCuentaInicial() { return request.auth.token.email == '1000@lajosefina-dpc.app'; }
 
@@ -41,12 +42,12 @@ service cloud.firestore {
       allow read: if activo();
       allow create: if activo()
         && maquinaValida(request.resource.data.equipo)
-        && (gestor() || (
-              rol() in ['Mecánico', 'Supervisor de mantenimiento', 'Operador']
+        && (principal() || (
+              rol() in ['Mecánico', 'Ingeniero de procesos', 'Operador']
               && request.resource.data.tecnicoUid == request.auth.uid
               && request.resource.data.tecnico == miPerfil().data.nombre
               && request.resource.data.creadoEn == request.time
-              && (rol() != 'Operador' || request.resource.data.tipo == 'Reporte de falla')
+              && (rol() == 'Mecánico' || request.resource.data.tipo == 'Reporte de falla')
               && (request.resource.data.tipo != 'Reporte de falla' || request.resource.data.estado == 'Pendiente')));
       allow update: if gestor()
         || (mecanico() && resource.data.tipo == 'Reporte de falla'

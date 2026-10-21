@@ -15,9 +15,11 @@ const db = getFirestore();
 const URL_BASE = 'https://mantenimiento-la-josefina.github.io/';
 const DOMINIO = 'lajosefina-dpc.app';
 const PRINCIPAL = 'Administrador principal';
-const ROLES_ASIGNABLES = ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Operador'];
-const ROLES_ALTAS = [PRINCIPAL, 'Administrador', 'Dirección', 'Gerencia', 'Coordinación'];
+const ROLES_ASIGNABLES = ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Ingeniero de procesos', 'Operador'];
+const ROLES_ALTAS = [PRINCIPAL, 'Administrador', 'Dirección', 'Gerencia'];
 const ROLES_AVISO = ['Mecánico', 'Supervisor de mantenimiento'];
+const ROLES_ESCALAR = ['Supervisor de mantenimiento', 'Coordinación', PRINCIPAL];
+const MIN_ESCALAR = 10;
 const MAQUINAS = {
   'AMP-LA-001': { planta: 'AM Pack', zona: 'Línea A', nombre: 'Envasadora vertical' },
   'AMP-LB-001': { planta: 'AM Pack', zona: 'Línea B', nombre: 'Envasadora vertical' },
@@ -34,8 +36,11 @@ async function exigir(req, roles) {
   if (!p || p.activo !== true || !roles.includes(p.rol)) throw new HttpsError('permission-denied', 'No tienes permiso para esta acción.');
   return p;
 }
-function leDebeLlegar(perfil, equipo) {
-  if (!perfil || perfil.activo !== true || !ROLES_AVISO.includes(perfil.rol)) return false;
+// Mecánicos: cada aviso. Supervisores: el primero y uno de cada 3 repeticiones (menos insistente).
+function leDebeLlegar(perfil, equipo, n, roles) {
+  roles = roles || ROLES_AVISO;
+  if (!perfil || perfil.activo !== true || !roles.includes(perfil.rol)) return false;
+  if (!roles.includes('Coordinación') && perfil.rol === 'Supervisor de mantenimiento' && n > 1 && (n - 1) % 3 !== 0) return false;
   const m = MAQUINAS[equipo];
   if (perfil.linea && perfil.linea !== 'todas') return perfil.linea === equipo;
   if (perfil.planta && m) return perfil.planta === m.planta;
@@ -77,14 +82,14 @@ exports.avisarFalla = onDocumentCreated('registros/{id}', async (event) => {
   logger.info('Aviso de falla', event.params.id, out);
 });
 
-async function destinosPara(equipo) {
+async function destinosPara(equipo, n, roles) {
   const tokSnap = await db.collection('tokens').get();
   const porUid = {};
   tokSnap.forEach(d => { const t = d.data(); if (t.uid) (porUid[t.uid] = porUid[t.uid] || []).push(d.id); });
   const destinos = [];
   for (const uid of Object.keys(porUid)) {
     const p = await perfilDe(uid);
-    if (leDebeLlegar(p, equipo)) destinos.push(...porUid[uid]);
+    if (leDebeLlegar(p, equipo, n || 1, roles)) destinos.push(...porUid[uid]);
   }
   return destinos;
 }
@@ -92,7 +97,7 @@ async function avisar(r, id, n) {
   const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '', nombre: '' };
   const titulo = (n > 1 ? '🚨🚨 SIN ATENDER (' + n + '/' + MAX_AVISOS + ') ' : '🚨 ') + 'Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
   const cuerpo = (r.tipoFalla || 'Falla') + ' — ' + String(r.actividad || '').slice(0, 140) + ' · Reportó ' + (r.tecnico || '');
-  return enviar(await destinosPara(r.equipo), mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + id + '-' + n));
+  return enviar(await destinosPara(r.equipo, n), mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + id + '-' + n));
 }
 
 // 1b) Mientras la falla siga sin atender, el aviso se repite cada minuto (máximo 10 veces)
@@ -105,6 +110,12 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
     if (!['Pendiente', 'Abierta'].includes(r.estado)) continue;
     const creado = r.creadoEn && r.creadoEn.toMillis ? r.creadoEn.toMillis() : 0;
     const n = r.avisos || 1;
+    if (creado && !r.escalado && ahora - creado >= MIN_ESCALAR * 60000) {
+      await d.ref.update({ escalado: true });
+      const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
+      const out = await enviar(await destinosPara(r.equipo, 1, ROLES_ESCALAR), mensaje('⚠️ Falla sin atender ' + MIN_ESCALAR + ' min · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — ningún mecánico la ha tomado. Reportó ' + (r.tecnico || ''), URL_BASE + '#alertas', 'esc-' + d.id));
+      logger.info('Escalamiento', d.id, out);
+    }
     if (!creado || n >= MAX_AVISOS || ahora - creado < 50000 || ahora - creado > (MAX_AVISOS + 2) * 60000) continue;
     await d.ref.update({ avisos: n + 1 });
     const out = await avisar(r, d.id, n + 1);

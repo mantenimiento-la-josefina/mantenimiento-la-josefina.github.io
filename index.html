@@ -387,7 +387,7 @@ function suscribir(){
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
     if(!primeraCarga&&avisa()){const nv=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nv.length){sirenaSuave(true);const m=maq(nv[0].equipo);toast('🚨 Nueva falla en '+(m?m.zona:nv[0].equipo)+': '+(nv[0].tipoFalla||''));parpadearTitulo()}}
     if(!primeraCarga&&insiste()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
-    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;setTimeout(()=>procesarEscaneo(em),0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
+    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
@@ -472,11 +472,13 @@ document.addEventListener('input',e=>{if(e.target.closest('#app form'))$('app').
 // ===== Alertas en tiempo real =====
 function desbloquearAudio(){try{if(!audioCtx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;audioCtx=new C()}if(audioCtx.state==='suspended')audioCtx.resume();
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();g.gain.value=0.0001;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.05);sonidoOn=true}catch(e){}}
+const SONANDO=[],TOMANDO=new Set();
+function callarYa(){while(SONANDO.length){const o=SONANDO.pop();try{o.stop()}catch(e){}}try{navigator.vibrate&&navigator.vibrate(0)}catch(e){}}
 function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultimoSonido=Date.now();
   try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
-    for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3)}}catch(e){}
+    for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3);SONANDO.push(o)}while(SONANDO.length>40)SONANDO.shift();}catch(e){}
   try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}}
-function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c))}
+function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).filter(r=>!TOMANDO.has(r.id)).sort((a,c)=>msCreado(a)-msCreado(c))}
 function abrirAlarma(){if(!perfil||!insiste())return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
   const r=pend[0],m=maq(r.equipo),a=$('alarma');
   a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<div class="instruccion">Para atenderla y apagar la alarma, escanea el código QR de la máquina.</div><button class="atender" id="abrirEscaner">📷 Escanear QR de la máquina</button></div>`;
@@ -486,9 +488,11 @@ function sirenaForzada(){const s0=silencioHasta;silencioHasta=0;sirena();silenci
 async function procesarEscaneo(id){const m=maq(id);if(!m){toast('Ese código no corresponde a ninguna máquina registrada.');return}
   maqSel=id;const pend=REG.filter(r=>r.equipo===id&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b));
   if(pend.length){const r=pend[0],ref=db.collection('registros').doc(r.id);
-    try{await db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists||!PENDIENTES.includes(s.data().estado))throw {code:'tomada'};tx.update(ref,{estado:'En atención',atendidoUid:usuario.uid,atendidoPor:perfil.nombre,inicioAtencion:TS()})});
-      toast('✅ Falla de '+m.zona+' tomada a tu nombre. Hora de inicio registrada.');if(!misPendientes().length)cerrarAlarma();else abrirAlarma();ir('alertas')}
-    catch(e){toast(errTxt(e.code==='permission-denied'?{code:'tomada'}:e));ir('alertas')}
+    // Se apaga la alarma en el instante en que se lee el QR; la asignación se confirma en segundo plano
+    TOMANDO.add(r.id);callarYa();if(!misPendientes().length)cerrarAlarma();else abrirAlarma();
+    toast('✅ Falla de '+m.zona+' tomada a tu nombre.');ir('alertas');
+    try{await ref.update({estado:'En atención',atendidoUid:usuario.uid,atendidoPor:perfil.nombre,inicioAtencion:TS()});TOMANDO.delete(r.id)}
+    catch(e){TOMANDO.delete(r.id);toast(errTxt(e.code==='permission-denied'?{code:'tomada'}:e));if(misPendientes().length)abrirAlarma();render(true)}
     return}
   const mia=REG.find(r=>r.equipo===id&&fallaEnAtencion(r)&&r.atendidoUid===usuario.uid);
   if(mia){toast('Ya estás atendiendo la falla de '+m.zona+'. Finalízala cuando termines.');ir('alertas');return}
@@ -537,7 +541,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTM
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
 let escVistas=0;
-setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena();
+setInterval(()=>{actualizarRelojes();if(atiende()&&misPendientes().length&&Date.now()-ultimoSonido>45000)sirena();
   if((pendSinEnterar().length||escSinEnterar().length)&&Date.now()-ultimoSuave>30000)sirenaSuave();
   const ne=escSinEnterar().length;if(ne!==escVistas){escVistas=ne;pintarBanner()}},1000);
 async function pedirWakeLock(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}

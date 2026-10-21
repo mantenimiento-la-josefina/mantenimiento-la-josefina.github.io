@@ -20,6 +20,7 @@ const ROLES_ALTAS = [PRINCIPAL, 'Administrador', 'Dirección', 'Gerencia'];
 const ROLES_AVISO = ['Mecánico', 'Supervisor de mantenimiento'];
 const ROLES_ESCALAR = ['Supervisor de mantenimiento', 'Coordinación', PRINCIPAL];
 const MIN_ESCALAR = 10;
+const MAX_ESCALAR = 12; // hasta 2 horas
 const MAQUINAS = {
   'AMP-LA-001': { planta: 'AM Pack', zona: 'Línea A', nombre: 'Envasadora vertical' },
   'AMP-LB-001': { planta: 'AM Pack', zona: 'Línea B', nombre: 'Envasadora vertical' },
@@ -110,10 +111,11 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
     if (!['Pendiente', 'Abierta'].includes(r.estado)) continue;
     const creado = r.creadoEn && r.creadoEn.toMillis ? r.creadoEn.toMillis() : 0;
     const n = r.avisos || 1;
-    if (creado && !r.escalado && ahora - creado >= MIN_ESCALAR * 60000) {
-      await d.ref.update({ escalado: true });
+    const yaEsc = r.escalado === true ? 1 : Number(r.escalado || 0);
+    if (creado && yaEsc < MAX_ESCALAR && ahora - creado >= (yaEsc + 1) * MIN_ESCALAR * 60000) {
+      await d.ref.update({ escalado: yaEsc + 1 });
       const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
-      const out = await enviar(await destinosPara(r.equipo, 1, ROLES_ESCALAR), mensaje('⚠️ Falla sin atender ' + MIN_ESCALAR + ' min · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — ningún mecánico la ha tomado. Reportó ' + (r.tecnico || ''), URL_BASE + '#alertas', 'esc-' + d.id));
+      const out = await enviar(await destinosPara(r.equipo, 1, ROLES_ESCALAR), mensaje('⚠️ Falla sin atender ' + (yaEsc + 1) * MIN_ESCALAR + ' min · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — ningún mecánico la ha tomado. Reportó ' + (r.tecnico || ''), URL_BASE + '#alertas', 'esc-' + d.id + '-' + (yaEsc + 1)));
       logger.info('Escalamiento', d.id, out);
     }
     if (!creado || n >= MAX_AVISOS || ahora - creado < 50000 || ahora - creado > (MAX_AVISOS + 2) * 60000) continue;

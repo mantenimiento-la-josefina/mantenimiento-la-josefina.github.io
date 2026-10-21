@@ -240,7 +240,7 @@ const VISTAS = {
   coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
   'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
-  'Ingeniero de procesos':['tablero','falla','indicadores','ficha','cuenta'],
+  'Ingeniero de procesos':['tablero','falla','historial','indicadores','ficha','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
@@ -250,7 +250,7 @@ const NAV = {
   coordinacion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores']],
   'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
-  'Ingeniero de procesos':[['falla','🚨 Reportar falla'],['tablero','🟢 Tablero de producción'],['indicadores','Indicadores']],
+  'Ingeniero de procesos':[['falla','🚨 Reportar falla'],['tablero','🟢 Tablero de producción'],['historial','📋 Historial de ajustes y reparaciones'],['indicadores','Indicadores']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
 const INICIO = {principal:'panel','Administrador':'usuarios',direccion:'tablero',coordinacion:'tablero','Supervisor de mantenimiento':'alertas','Mecánico':'alertas','Ingeniero de procesos':'tablero','Operador':'falla'};
@@ -515,7 +515,8 @@ const MIN_ESCALAR=10;
 function marcarEnterado(ids){ids.forEach(i=>ENTERADO.add(i));LS.set('dpc_enterado',[...ENTERADO].slice(-400));pintarBanner()}
 function pendSinEnterar(){return avisa()?misPendientes().filter(r=>!ENTERADO.has(r.id)):[]}
 function escaladas(){if(!recibeEsc())return [];return REG.filter(r=>fallaPendiente(r)&&deMiLinea(r)&&Date.now()-msCreado(r)>=MIN_ESCALAR*60000).sort((a,b)=>msCreado(a)-msCreado(b))}
-function escSinEnterar(){return escaladas().filter(r=>!ENTERADO.has(r.id+'-esc'))}
+function bloqueEsc(r){return Math.floor((Date.now()-msCreado(r))/(MIN_ESCALAR*60000))}
+function escSinEnterar(){return escaladas().filter(r=>!ENTERADO.has(r.id+'-esc'+bloqueEsc(r)))}
 function sirenaSuave(ya){if(!sonidoOn||!audioCtx)return;ultimoSuave=Date.now();
   try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
     for(let i=0;i<3;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.value=i%2?660:880;g.gain.setValueAtTime(0.0001,t0+i*0.4);g.gain.exponentialRampToValueAtTime(0.18,t0+i*0.4+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.4+0.34);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.4);o.stop(t0+i*0.4+0.36)}}catch(e){}
@@ -529,7 +530,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTM
   if(ep==='ios-instalar')h+=`<div class="activar"><span>📲 Para recibir fallas con el iPhone bloqueado: toca Compartir → «Agregar a inicio» y abre la app desde ese ícono.</span></div>`;
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
   const esc_=escSinEnterar();
-  if(esc_.length){const p=esc_[0],m=maq(p.equipo);h+=`<div class="alerta pulso" style="background:#8a1020"><div><b>⚠️ ${esc_.length} falla${esc_.length>1?'s llevan':' lleva'} más de ${MIN_ESCALAR} min sin que un mecánico la tome</b><br>${esc(m?(m.planta+' · '+m.zona):'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div><div class="acciones" style="margin:0"><button class="mini" id="enteradoEsc">Enterado</button></div></div>`}
+  if(esc_.length){const p=esc_[0],m=maq(p.equipo);h+=`<div class="alerta pulso" style="background:#8a1020"><div><b>⚠️ ${esc_.length} falla${esc_.length>1?'s llevan':' lleva'} más de ${bloqueEsc(p)*MIN_ESCALAR} min sin que un mecánico la tome</b><br>${esc(m?(m.planta+' · '+m.zona):'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div><div class="acciones" style="margin:0"><button class="mini" id="enteradoEsc">Enterado</button></div></div>`}
   if(pend.length&&(atiende()||avisa())){const p=pend[0],m=maq(p.equipo);
     h+=`<div class="alerta ${avisa()&&!pendSinEnterar().length?'':'pulso'}"><div><b>🚨 ${pend.length} falla${pend.length>1?'s':''} sin atender</b><br>${esc(m?m.zona:'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div>
     <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}${insiste()?'<button class="mini" id="abrirEscaner">📷 Escanear QR</button>':avisa()?(pendSinEnterar().length?'<button class="mini" id="enteradoSup">Enterado</button>':'<span>✓ Enterado</span>'):`<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button>`}</div></div>`}
@@ -790,10 +791,10 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea administradores y modifica, cambia de puesto, activa o desactiva cuentas.</div></div>
   <div class="item"><div><span class="tag bad">Administrador</span> Solo da de alta usuarios (excepto administradores).</div></div>
   <div class="item"><div><span class="tag plan">Dirección / Gerencia</span> Ven todo: tablero de producción, fallas en vivo, indicadores, trabajos registrados y abiertos. Dan de alta usuarios. No modifican registros.</div></div>
-  <div class="item"><div><span class="tag plan">Coordinación de Producción</span> Tablero de producción, fallas en vivo e indicadores. Aviso si una falla pasa ${MIN_ESCALAR} min sin atender.</div></div>
-  <div class="item"><div><span class="tag warn">Supervisor de mantenimiento</span> Fallas en vivo con aviso que se repite hasta tocar «Enterado», tablero, trabajos, historial, indicadores y calendario. Corrige y cierra registros. No reporta fallas ni registra trabajos.</div></div>
+  <div class="item"><div><span class="tag plan">Coordinación de Producción</span> Tablero de producción, fallas en vivo e indicadores. Aviso cada ${MIN_ESCALAR} min mientras una falla siga sin atender.</div></div>
+  <div class="item"><div><span class="tag warn">Supervisor de mantenimiento</span> Fallas en vivo con aviso que se repite hasta tocar «Enterado» (y otra vez cada 10 min si nadie la atiende), tablero, trabajos, historial, indicadores y calendario. Corrige y cierra registros. No reporta fallas ni registra trabajos.</div></div>
   <div class="item"><div><span class="tag warn">Mecánico</span> Alarma que solo se apaga escaneando el QR de la máquina; al escanear toma la falla. Registra y finaliza trabajos.</div></div>
-  <div class="item"><div><span class="tag plan">Ingeniero de procesos</span> Reporta fallas, ve el tablero de producción y los indicadores.</div></div>
+  <div class="item"><div><span class="tag plan">Ingeniero de procesos</span> Reporta fallas, ve el tablero de producción, el historial de ajustes y reparaciones y los indicadores.</div></div>
   <div class="item"><div><span class="tag">Operador</span> Reporta fallas y consulta ajustes y reparaciones anteriores.</div></div>
   <p class="muted">Para eliminar un perfil, primero desactívalo; después aparece el botón «Eliminar». Los trabajos y fallas que registró se conservan en el historial.</p>
   <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Mantenimiento 2000–2999 · Operadores 3000–3999 · Ingenieros de procesos 4000–4999.</p></div>`};
@@ -904,7 +905,7 @@ document.addEventListener('click',async e=>{
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
   if(b.id==='abrirEscaner'){abrirEscaner();return}
   if(b.id==='enteradoSup'){marcarEnterado(misPendientes().map(r=>r.id));toast('Enterado. Te avisaremos si llega otra falla.');return}
-  if(b.id==='enteradoEsc'){marcarEnterado(escaladas().map(r=>r.id+'-esc'));toast('Enterado.');return}
+  if(b.id==='enteradoEsc'){marcarEnterado(escaladas().map(r=>r.id+'-esc'+bloqueEsc(r)));toast('Enterado.');return}
   if(b.id==='cerrarEscaner'){cerrarEscaner();return}
   if(b.id==='silenciar'){if(insiste())return;silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
   if(b.id==='tableroCompleto'){tableroCompleto=!tableroCompleto;document.body.classList.toggle('modo-pantalla',tableroCompleto);render(true);return}

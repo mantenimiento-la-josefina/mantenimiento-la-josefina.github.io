@@ -174,6 +174,11 @@ body.modo-pantalla .wrap{max-width:none}
 #alarma button{display:block;width:100%;margin-top:14px;padding:18px;font-size:20px;font-weight:700;border-radius:14px;border:0}
 #alarma .atender{background:#fff;color:#b00020}
 #alarma .callar{background:transparent;color:#fff;border:2px solid #fff}
+#alarma .instruccion{font-size:19px;font-weight:700;background:#ffffff22;border-radius:12px;padding:12px;margin-top:14px}
+#escaner{position:fixed;inset:0;z-index:10000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));color:#fff;text-align:center}
+#escaner[hidden]{display:none}
+#escaner video{width:100%;max-width:480px;border-radius:14px;border:4px solid #fff}
+#escaner button{padding:16px 22px;font-size:18px;border-radius:12px;border:0;background:#fff;color:#173f80;font-weight:700}
 </style>
 </head>
 <body>
@@ -187,6 +192,7 @@ body.modo-pantalla .wrap{max-width:none}
 <div id="visor" hidden></div>
 <div class="toast" id="toast" hidden></div>
 <div id="alarma" hidden></div>
+<div id="escaner" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -253,7 +259,7 @@ let REG=[], PROG=[], MAQCFG={}, USUARIOS=[];
 let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
-let pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
+let escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
 let audioCtx=null, sonidoOn=false, silencioHasta=0, ultimoSonido=0, wakeLock=null;
 
 // ===== Utilidades =====
@@ -371,7 +377,7 @@ function suscribir(){
   subs.push(db.collection('registros').onSnapshot(s=>{
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
     if(!primeraCarga&&insiste()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
-    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
+    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;setTimeout(()=>procesarEscaneo(em),0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
@@ -380,6 +386,7 @@ function entrar(){
   pintarSesion();
   if(atiende()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
   let v=inicioRol();
+  if(destino&&destino.vista==='qr'&&insiste()){const d=destino;destino=null;maqSel=d.maq;escaneoPendiente=d.maq;ir('alertas');return}
   if(destino&&destino.vista==='qr'){const d=destino;destino=null;maqSel=d.maq;
     if(vistasPermitidas().includes('falla')){maqForm=d.maq;maqFija=d.maq;ir('falla',true);return}
     ir('ficha');return}
@@ -460,11 +467,35 @@ function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultim
     for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3)}}catch(e){}
   try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}}
 function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c))}
-function abrirAlarma(){if(!perfil||!insiste()||Date.now()<silencioHasta)return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
+function abrirAlarma(){if(!perfil||!insiste())return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
   const r=pend[0],m=maq(r.equipo),a=$('alarma');
-  a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<button class="atender" data-atender="${esc(r.id)}">Atender falla</button><button class="callar" id="silenciar">Silenciar 5 min</button></div>`;
+  a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<div class="instruccion">Para atenderla y apagar la alarma, escanea el código QR de la máquina.</div><button class="atender" id="abrirEscaner">📷 Escanear QR de la máquina</button></div>`;
   a.hidden=false;sirena();
-  if(!abrirAlarma._i)abrirAlarma._i=setInterval(()=>{if(!misPendientes().length||Date.now()<silencioHasta)return cerrarAlarma();sirena()},3000)}
+  if(!abrirAlarma._i)abrirAlarma._i=setInterval(()=>{if(!misPendientes().length)return cerrarAlarma();sirenaForzada()},3000)}
+function sirenaForzada(){const s0=silencioHasta;silencioHasta=0;sirena();silencioHasta=s0}
+async function procesarEscaneo(id){const m=maq(id);if(!m){toast('Ese código no corresponde a ninguna máquina registrada.');return}
+  maqSel=id;const pend=REG.filter(r=>r.equipo===id&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b));
+  if(pend.length){const r=pend[0],ref=db.collection('registros').doc(r.id);
+    try{await db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists||!PENDIENTES.includes(s.data().estado))throw {code:'tomada'};tx.update(ref,{estado:'En atención',atendidoUid:usuario.uid,atendidoPor:perfil.nombre,inicioAtencion:TS()})});
+      toast('✅ Falla de '+m.zona+' tomada a tu nombre. Hora de inicio registrada.');if(!misPendientes().length)cerrarAlarma();else abrirAlarma();ir('alertas')}
+    catch(e){toast(errTxt(e.code==='permission-denied'?{code:'tomada'}:e));ir('alertas')}
+    return}
+  const mia=REG.find(r=>r.equipo===id&&fallaEnAtencion(r)&&r.atendidoUid===usuario.uid);
+  if(mia){toast('Ya estás atendiendo la falla de '+m.zona+'. Finalízala cuando termines.');ir('alertas');return}
+  toast('No hay fallas pendientes en '+m.zona+'.');maqForm=id;maqFija=id;ir('falla',true)}
+let escStream=null,escLoop=null;
+function cargarJsQR(){return window.jsQR?Promise.resolve():new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';sc.onload=res;sc.onerror=rej;document.head.appendChild(sc)})}
+async function abrirEscaner(){const e=$('escaner');e.hidden=false;
+  e.innerHTML='<h2 style="margin:0;color:#fff">📷 Escanea el QR de la máquina</h2><video id="escVideo" playsinline muted autoplay></video><p id="escMsg">Apunta la cámara al código pegado en la máquina.</p><button id="cerrarEscaner">Cancelar</button>';
+  try{await cargarJsQR();escStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    const v=$('escVideo');v.srcObject=escStream;await v.play();const c=document.createElement('canvas'),g=c.getContext('2d',{willReadFrequently:true});
+    const paso=()=>{if(!escStream)return;if(v.readyState>=2){c.width=v.videoWidth;c.height=v.videoHeight;g.drawImage(v,0,0);const d=g.getImageData(0,0,c.width,c.height);const q=window.jsQR(d.data,c.width,c.height,{inversionAttempts:'dontInvert'});
+      if(q&&q.data){let id=null;try{const u=new URL(q.data);const mm=maqPorClave(u.searchParams.get('m'))||MAQUINAS.find(x=>x.id===u.searchParams.get('equipo'));id=mm&&mm.id}catch(er){}
+        if(id){try{navigator.vibrate&&navigator.vibrate(150)}catch(er){}cerrarEscaner();procesarEscaneo(id);return}
+        $('escMsg').textContent='Ese código no es de una máquina del sistema. Intenta con el QR pegado en la máquina.'}}
+      escLoop=requestAnimationFrame(paso)};paso()}
+  catch(er){$('escMsg').textContent='No se pudo abrir la cámara. Permite el acceso a la cámara para esta página, o escanea el QR con la cámara del teléfono.'}}
+function cerrarEscaner(){if(escLoop)cancelAnimationFrame(escLoop);escLoop=null;if(escStream){escStream.getTracks().forEach(t=>t.stop());escStream=null}const e=$('escaner');e.hidden=true;e.innerHTML=''}
 function cerrarAlarma(){clearInterval(abrirAlarma._i);abrirAlarma._i=null;const a=$('alarma');if(a){a.hidden=true;a.innerHTML=''}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&misPendientes().length)abrirAlarma()});
 function nuevaFalla(r){abrirAlarma();const m=maq(r.equipo);toast('🚨 Nueva falla en '+(m?m.zona:r.equipo)+': '+(r.tipoFalla||'')) ;parpadearTitulo()}
@@ -479,7 +510,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;
   if(!sonidoOn)h+=`<div class="activar"><span>🔔 Toca para recibir el sonido de las alertas en este dispositivo.</span><button class="mini" id="activarAlertas">Activar alertas</button></div>`;
   if(pend.length){const p=pend[0],m=maq(p.equipo);
     h+=`<div class="alerta pulso"><div><b>🚨 ${pend.length} falla${pend.length>1?'s':''} sin atender</b><br>${esc(m?m.zona:'')} · ${esc(p.tipoFalla||'Falla')} · <span class="reloj" data-desde="${msCreado(p)}"></span></div>
-    <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button></div></div>`}
+    <div class="acciones" style="margin:0">${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ver fallas</button>':''}${insiste()?'<button class="mini" id="abrirEscaner">📷 Escanear QR</button>':`<button class="mini sec" id="silenciar">${Date.now()<silencioHasta?'Silenciado':'Silenciar 5 min'}</button>`}</div></div>`}
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
 setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena()},1000);
@@ -539,7 +570,7 @@ function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=
   <p style="margin:0 0 6px">${esc(r.actividad)}</p>
   <small class="muted">Reportó ${esc(r.tecnico)} a las ${hhmm(msCreado(r))||esc(r.hora)}${en?` · Atiende <b>${esc(r.atendidoPor||'')}</b> desde ${hhmm(ms(r.inicioAtencion))}`:''}</small>
   ${r.fotos&&r.fotos.length?'<div class="acciones" style="margin-top:8px">'+fotosBtn(r.fotos)+'</div>':''}
-  ${opc.acciones&&atiende()?(PENDIENTES.includes(r.estado)?`<div class="acciones"><button class="falla xl" data-atender="${esc(r.id)}">Atender falla</button></div>`:mia&&finalizando!==r.id?`<div class="acciones"><button class="xl" data-finalizar="${esc(r.id)}">Finalizar trabajo</button></div>`:''):''}
+  ${opc.acciones&&atiende()?(PENDIENTES.includes(r.estado)?(insiste()?`<div class="acciones"><button class="falla xl" id="abrirEscaner">📷 Escanear QR para atender</button></div><small class="muted">La falla se toma a tu nombre al escanear el código de la máquina.</small>`:`<div class="acciones"><button class="falla xl" data-atender="${esc(r.id)}">Atender falla</button></div>`):mia&&finalizando!==r.id?`<div class="acciones"><button class="xl" data-finalizar="${esc(r.id)}">Finalizar trabajo</button></div>`:''):''}
   ${mia&&finalizando===r.id?formFinalizar(r):''}</div>`}
 function formFinalizar(r){return `<form id="fFinalizar" data-id="${esc(r.id)}" style="margin-top:10px"><label for="z_trab">Trabajo realizado</label><textarea id="z_trab" required maxlength="2000"></textarea>
   <label for="z_aj">Ajustes efectuados</label><textarea id="z_aj" maxlength="2000" style="min-height:70px"></textarea>
@@ -843,12 +874,15 @@ document.addEventListener('click',async e=>{
   if(b.id==='probarPush'){b.disabled=true;try{const r=await llamar('probarNotificacion',{});toast(r&&r.enviados?'Notificación de prueba enviada. Bloquea el teléfono y espera unos segundos.':'No hay teléfonos registrados con tu cuenta. Toca «Activar notificaciones».')}catch(er){toast(errTxt(er))}b.disabled=false;return}
   if(b.id==='cerrarVisor'){$('visor').hidden=true;$('visor').innerHTML='';return}
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
-  if(b.id==='silenciar'){silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
+  if(b.id==='abrirEscaner'){abrirEscaner();return}
+  if(b.id==='cerrarEscaner'){cerrarEscaner();return}
+  if(b.id==='silenciar'){if(insiste())return;silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
   if(b.id==='tableroCompleto'){tableroCompleto=!tableroCompleto;document.body.classList.toggle('modo-pantalla',tableroCompleto);render(true);return}
   if(b.id==='miCuenta'){ir('cuenta');return}
   if(b.closest('#nav')&&b.dataset.v){ir(b.dataset.v);return}
   if(b.dataset.v2){ir(b.dataset.v2);return}
   if(b.dataset.fotos){verFotos(b.dataset.fotos.split(','));return}
+  if(b.dataset.atender&&insiste()){abrirEscaner();return}
   if(b.dataset.atender){await atender(b.dataset.atender,b);if(!misPendientes().length)cerrarAlarma();else if(abrirAlarma._i)abrirAlarma();return}
   if(b.dataset.finalizar){finalizando=b.dataset.finalizar;render(true);const t=$('z_trab');if(t)t.focus();return}
   if(b.dataset.ficha){maqSel=b.dataset.ficha;ir('ficha');return}

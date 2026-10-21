@@ -176,6 +176,22 @@ exports.restablecerContrasena = onCall(async (req) => {
   return { ok: true };
 });
 
+// 4b) Eliminar el perfil de un trabajador que ya no está activo (solo Administrador principal). El historial se conserva.
+exports.eliminarUsuario = onCall(async (req) => {
+  await exigir(req, [PRINCIPAL]);
+  const uid = String((req.data || {}).uid || '');
+  const p = await perfilDe(uid);
+  if (!p) throw new HttpsError('not-found', 'No existe ese usuario.');
+  if (p.rol === PRINCIPAL) throw new HttpsError('permission-denied', 'No se puede eliminar al Administrador principal.');
+  if (p.activo === true) throw new HttpsError('failed-precondition', 'Primero desactiva la cuenta y después elimínala.');
+  try { await getAuth().deleteUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw new HttpsError('internal', 'No se pudo eliminar la cuenta.'); }
+  const t = await db.collection('tokens').where('uid', '==', uid).get();
+  await Promise.all(t.docs.map(d => d.ref.delete()));
+  await db.doc('usuarios/' + uid).delete();
+  logger.info('Perfil eliminado', uid, p.usuario, 'por', req.auth.uid);
+  return { ok: true };
+});
+
 // 5) Notificación de prueba para el teléfono de quien la pide
 exports.probarNotificacion = onCall(async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Inicia sesión.');

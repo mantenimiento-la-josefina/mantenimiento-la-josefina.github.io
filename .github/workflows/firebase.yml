@@ -46,7 +46,7 @@ jobs:
           SA_EMAIL=$(python3 -c "import json,os;print(json.load(open(os.environ['RUNNER_TEMP']+'/sa.json'))['client_email'])")
           gcloud projects add-iam-policy-binding mantenimiento-la-josefina --member="serviceAccount:$SA_EMAIL" --role=roles/run.admin --condition=None -q >/dev/null
           sleep 30
-          for f in crearusuario restablecercontrasena probarnotificacion; do
+          for f in crearusuario restablecercontrasena probarnotificacion eliminarusuario; do
             if gcloud run services add-iam-policy-binding $f --region us-central1 --project mantenimiento-la-josefina --member=allUsers --role=roles/run.invoker -q >/dev/null 2>err.txt; then echo "::notice::$f abierto"; else echo "::error::$f: $(tail -1 err.txt)"; fi
           done
           echo "::notice::Después: crearUsuario responde HTTP $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' $U)"

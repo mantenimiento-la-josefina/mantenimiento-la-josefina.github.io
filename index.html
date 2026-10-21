@@ -785,7 +785,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
   <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
   <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
-  <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
+  <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button>${u.activo?'':`<button class="mini peligro" data-eliminarusr="${esc(u.uid)}">Eliminar</button>`}</div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
   <div class="item"><div><span class="tag bad">Administrador principal</span> Acceso completo. Único que crea administradores y modifica, cambia de puesto, activa o desactiva cuentas.</div></div>
   <div class="item"><div><span class="tag bad">Administrador</span> Solo da de alta usuarios (excepto administradores).</div></div>
@@ -795,6 +795,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="item"><div><span class="tag warn">Mecánico</span> Alarma que solo se apaga escaneando el QR de la máquina; al escanear toma la falla. Registra y finaliza trabajos.</div></div>
   <div class="item"><div><span class="tag plan">Ingeniero de procesos</span> Reporta fallas, ve el tablero de producción y los indicadores.</div></div>
   <div class="item"><div><span class="tag">Operador</span> Reporta fallas y consulta ajustes y reparaciones anteriores.</div></div>
+  <p class="muted">Para eliminar un perfil, primero desactívalo; después aparece el botón «Eliminar». Los trabajos y fallas que registró se conservan en el historial.</p>
   <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Mantenimiento 2000–2999 · Operadores 3000–3999 · Ingenieros de procesos 4000–4999.</p></div>`};
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
@@ -933,6 +934,9 @@ document.addEventListener('click',async e=>{
     try{if(b.dataset.borrar){await db.collection('registros').doc(b.dataset.borrar).delete();toast('Registro eliminado.')}else{await db.collection('programa').doc(b.dataset.borrarprog).delete();toast('Programa eliminado.')}}catch(er){toast(errTxt(er))}return}
   if(b.dataset.realizar){const p=PROG.find(x=>x.id===b.dataset.realizar);if(!p)return;prefill={progId:p.id,equipo:p.equipo,fecha:p.fecha<=hoy()?hoy():p.fecha,actividad:p.actividad,tecnico:p.responsable||perfil.nombre,tipo:'Preventivo'};ir('registrar',true);return}
   if(b.dataset.editusr){usrEdit=b.dataset.editusr;usrAlta=false;render(true);window.scrollTo({top:0});return}
+  if(b.dataset.eliminarusr){const u=USUARIOS.find(x=>x.uid===b.dataset.eliminarusr);if(!u||u.activo)return;
+    if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='¿Eliminar definitivamente?';setTimeout(()=>{if(b.isConnected){b.dataset.ok='';b.textContent='Eliminar'}},5000);return}
+    b.disabled=true;b.textContent='Eliminando…';try{await llamar('eliminarUsuario',{uid:u.uid});toast('Perfil de '+u.nombre+' eliminado. Su historial se conserva.')}catch(er){toast(errTxt(er));b.disabled=false;b.textContent='Eliminar'}return}
   if(b.dataset.activo){const u=USUARIOS.find(x=>x.uid===b.dataset.activo);if(!u)return;try{await db.collection('usuarios').doc(u.uid).update({activo:!u.activo});toast(u.activo?'Cuenta desactivada.':'Cuenta activada.')}catch(er){toast(errTxt(er))}return}
 });
 document.addEventListener('change',async e=>{const s=e.target.closest('select[data-rol]');if(!s||!esPrincipal())return;try{await db.collection('usuarios').doc(s.dataset.rol).update({rol:s.value});toast('Puesto actualizado.')}catch(er){toast(errTxt(er));render(true)}});

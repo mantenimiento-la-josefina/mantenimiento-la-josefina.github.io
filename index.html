@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Mantenimiento DPC">
-<meta name="theme-color" content="#8f1734">
+<meta name="theme-color" content="#173f80">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icono-180.png">
 <title>Mantenimiento La Josefina DPC</title>
@@ -13,7 +13,7 @@
 /* Layout: banda guinda de encabezado + columna central de tarjetas */
 :root{
   --bg:#f3f5f8;--card:#ffffff;--fg:#1c2833;--muted:#67717d;--line:#e9edf1;--input:#cfd4da;--th:#f6f7f9;
-  --accent:#8f1734;--accent-ink:#ffffff;--accent-soft:#f7e9ed;--accent-line:#e3d1d7;--header:#8f1734;
+  --accent:#1d4f9c;--accent-ink:#ffffff;--accent-soft:#e8effb;--accent-line:#c7d6f0;--header:#173f80;--marca-rojo:#d7262e;
   --ok:#276642;--ok-bg:#e9f5ee;--warn:#805700;--warn-bg:#fff2db;--bad:#a3262a;--bad-bg:#fde8e8;--plan:#2d4f8f;--plan-bg:#e8eefb;
   --la:#2d4f8f;--la-bg:#e8eefb;--lb:#6a3d8f;--lb-bg:#f1e8fb;--rojo:#c8102e;
   --shadow:0 2px 12px #1d24300d;
@@ -22,7 +22,7 @@
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141619;--card:#1e2126;--fg:#e8eaed;--muted:#9aa3ad;--line:#2d3138;--input:#3a3f47;--th:#24282e;
-  --accent:#c2405f;--accent-ink:#ffffff;--accent-soft:#3a1f27;--accent-line:#5a2e3a;--header:#6e1028;
+  --accent:#5b8fe6;--accent-ink:#0b1a33;--accent-soft:#1b2a45;--accent-line:#2f4a78;--header:#12305f;--marca-rojo:#e5383f;
   --ok:#7fd3a1;--ok-bg:#1d3327;--warn:#f0c46b;--warn-bg:#3a2f17;--bad:#f29494;--bad-bg:#3d1f21;--plan:#9db8f0;--plan-bg:#1f2a40;
   --la:#9db8f0;--la-bg:#1f2a40;--lb:#cfa8f0;--lb-bg:#2e2140;--rojo:#e0243f;
   --shadow:0 2px 12px #0006;color-scheme:dark}}
@@ -30,7 +30,7 @@
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom,0px)}
-header{background:var(--header);color:#fff;padding-top:env(safe-area-inset-top,0px)}
+header{background:var(--header);color:#fff;padding-top:env(safe-area-inset-top,0px);border-bottom:5px solid var(--marca-rojo)}
 .hin{max-width:1050px;margin:auto;padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 header h1{margin:0;font-size:24px;text-wrap:balance}
 header small{opacity:.85}
@@ -123,6 +123,15 @@ body.modo-pantalla .wrap{max-width:none}
 .tabhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .tabhead h1{margin:0;font-size:26px}
 .hora{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+/* Tablero de producción */
+.tablero-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:22px}
+.maqtile{border-radius:16px;padding:18px;color:#fff;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;box-shadow:0 4px 16px #0002}
+.maqtile.verde{background:#1e8a4c}.maqtile.rojo{background:#c8102e;animation:pulso 1.4s ease-in-out infinite}.maqtile.amarillo{background:#f2b705;color:#2b2100}
+.maqtile h3{margin:0;font-size:22px}.maqtile .est{font-size:20px;font-weight:800;letter-spacing:.02em}.maqtile small{opacity:.92;font-size:14px}
+.maqtile .reloj{font-size:18px}
+.maqtile.vacia{background:var(--th);color:var(--muted);box-shadow:none;min-height:80px}
+.semaforo{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 18px}.semaforo span{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.semaforo i{width:14px;height:14px;border-radius:50%;display:inline-block}
 /* Calendario */
 .calhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .calhead h2{margin:0;font-size:19px}
@@ -219,17 +228,19 @@ const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
-  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
+  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','cuenta'],
+  gestor:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','cuenta'],
   supervisor:['panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','pantalla','cuenta'],
+  coordinacion:['tablero','panel','alertas','maquinas','ficha','trabajos','abiertos','calendario','indicadores','usuarios','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
   'Supervisor de mantenimiento':['alertas','maquinas','ficha','registrar','falla','historial','abiertos','indicadores','pantalla','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
-  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['pantalla','Pantalla de mantenimiento']],
-  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
+  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento']],
+  gestor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento']],
   supervisor:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios'],['pantalla','Pantalla de mantenimiento']],
+  coordinacion:[['tablero','🟢 Tablero de producción'],['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Alta de usuarios']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
   'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['abiertos','Trabajos abiertos'],['historial','Historial'],['indicadores','Indicadores'],['pantalla','Pantalla de mantenimiento']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
@@ -242,7 +253,7 @@ let REG=[], PROG=[], MAQCFG={}, USUARIOS=[];
 let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
-let pendiente=false, primeraCarga=true, finalizando=null;
+let pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
 let audioCtx=null, sonidoOn=false, silencioHasta=0, ultimoSonido=0, wakeLock=null;
 
 // ===== Utilidades =====
@@ -267,14 +278,16 @@ function activoP(){return !!perfil&&perfil.activo===true}
 function esPrincipal(){return activoP()&&perfil.rol===PRINCIPAL}
 function esAdmin(){return activoP()&&ROLES_GESTION.includes(perfil.rol)} // puede modificar registros y configuración
 function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)}
-function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
+function esCoordinacion(){return activoP()&&perfil.rol==='Coordinación'}
+function grupo(){return esPrincipal()?'principal':esAdmin()?'gestor':esCoordinacion()?'coordinacion':esSupervisor()?'supervisor':(perfil&&perfil.rol)}
+const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r){return ROL_TXT[r]||r}
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
 function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
 function atiende(){return esAdmin()||esMecanico()}
 function insiste(){return esMecanico()}
 function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
-function inicioRol(){return esSupervisor()?'panel':esMecanico()?'alertas':'falla'}
+function inicioRol(){return esCoordinacion()?'tablero':esSupervisor()?'panel':esMecanico()?'alertas':'falla'}
 function correoDe(u){u=String(u||'').replace(/\s+/g,'').toLowerCase();return u+'@'+DOMINIO}
 function usuarioDe(correo){return String(correo||'').replace('@'+DOMINIO,'')}
 function ms(t){try{if(t&&t.toMillis)return t.toMillis()}catch(e){}return null}
@@ -322,16 +335,15 @@ const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 function leerDireccion(){
   const q=new URLSearchParams(location.search);const h=(location.hash||'').replace('#','');
   const m=maqPorClave(q.get('m'))||MAQUINAS.find(x=>x.id===q.get('equipo'));
-  if(m)return {vista:'ficha',maq:m.id};
+  if(m)return h==='ficha'?{vista:'ficha',maq:m.id}:{vista:'qr',maq:m.id};
   if(h==='ficha')return {vista:'ficha',maq:MAQUINAS[0].id};
   const f=h.match(/^ficha-([ab])$/i);if(f)return {vista:'ficha',maq:maqPorClave(f[1]).id};
   if(h)return {vista:h};
   return null;
 }
 function escribirDireccion(){
-  try{const url=vista==='ficha'?URL_BASE+'?m='+maq(maqSel).clave:URL_BASE+'#'+vista;
-    if(location.origin+location.pathname===URL_BASE)history.replaceState(null,'',url);
-    else history.replaceState(null,'',vista==='ficha'?'?m='+maq(maqSel).clave:'#'+vista)}catch(e){}
+  try{const conMaq=vista==='falla'&&maqFija?maqFija:vista==='ficha'?maqSel:null;const rel=conMaq?'?m='+maq(conMaq).clave+(vista==='ficha'?'#ficha':''):'#'+vista;
+    history.replaceState(null,'',(location.origin+location.pathname===URL_BASE?URL_BASE:'')+rel)}catch(e){}
 }
 
 // ===== Arranque =====
@@ -368,12 +380,15 @@ function entrar(){
   pintarSesion();
   if(atiende()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
   let v=inicioRol();
+  if(destino&&destino.vista==='qr'){const d=destino;destino=null;maqSel=d.maq;
+    if(vistasPermitidas().includes('falla')){maqForm=d.maq;maqFija=d.maq;ir('falla',true);return}
+    ir('ficha');return}
   if(destino){if(destino.maq)maqSel=destino.maq;if(vistasPermitidas().includes(destino.vista))v=destino.vista;else if(destino.vista&&destino.vista!=='ficha')toast('No tienes acceso a esa sección.');destino=null}
   ir(v);
 }
 function pintarSesion(){
   const s=$('sesion');s.hidden=false;
-  s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(perfil.rol)} · ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
+  s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(rolTxt(perfil.rol))} · ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
   const n=$('nav');n.hidden=false;n.className=perfil.rol==='Operador'?'grande':'';
   n.innerHTML=(NAV[grupo()]||[]).map(([v,t])=>`<button data-v="${v}">${t}</button>`).join('');
   marcarNav();
@@ -386,7 +401,7 @@ function pantallaLogin(){
   ocultarSesion();
   const m=destino&&destino.maq?maq(destino.maq):null;
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
-  ${m?`<p class="aviso">Al entrar verás la ficha de la ${esc(m.nombre)} · ${esc(m.zona)}.</p>`:''}
+  ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="l_pass">Contraseña</label><input id="l_pass" name="p" type="password" autocomplete="current-password" required>
   <div class="acciones"><button type="submit" class="xl">Entrar</button></div><div id="lErr"></div></form>
@@ -420,9 +435,9 @@ function pantallaSinAcceso(extra){
 function ir(v,keep){
   if(!perfil)return;
   if(!vistasPermitidas().includes(v)){if(v)toast('No tienes acceso a esa sección.');v=inicioRol()}
-  if(!keep){prefill=null;editId=null;maqForm=null;finalizando=null}
-  vista=v;document.body.classList.toggle('modo-pantalla',v==='pantalla');
-  if(v==='pantalla')pedirWakeLock();else soltarWakeLock();
+  if(!keep){prefill=null;editId=null;maqForm=null;maqFija=null;finalizando=null}
+  vista=v;document.body.classList.toggle('modo-pantalla',v==='pantalla'||(v==='tablero'&&tableroCompleto));
+  if(v==='pantalla'||v==='tablero')pedirWakeLock();else soltarWakeLock();
   escribirDireccion();render(true);window.scrollTo({top:0});
 }
 function formOcupado(){const a=$('app');if(a.dataset.v!==vista)return false;if(a.dataset.sucio==='1')return true;const el=document.activeElement;return !!(el&&a.contains(el)&&el.closest('form'))}
@@ -470,7 +485,7 @@ function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[da
 setInterval(()=>{actualizarRelojes();if(atiende()&&REG.some(r=>fallaPendiente(r)&&deMiLinea(r))&&Date.now()-ultimoSonido>45000)sirena()},1000);
 async function pedirWakeLock(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
 function soltarWakeLock(){try{if(wakeLock){wakeLock.release();wakeLock=null}}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&vista==='pantalla')pedirWakeLock()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(vista==='pantalla'||vista==='tablero'))pedirWakeLock()});
 
 // ===== Datos derivados =====
 function registros(id){return deMaq(REG,id||'todas').filter(r=>maq(r.equipo)).slice().sort(ordenar)}
@@ -552,6 +567,16 @@ V.alertas=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msC
   <h2>Fallas sin atender (${pend.length})</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0">No hay fallas pendientes. Cuando una operadora reporte una, aparecerá aquí al instante con alerta y sonido.</p></div>'}
   ${otras.length?`<h2>En atención por otros mecánicos</h2>${otras.map(r=>tarjetaFalla(r)).join('')}`:''}
   <div class="card"><h2>Atendidas hoy (${hoyCerr.length})</h2>${hoyCerr.length?hoyCerr.map(r=>{const t=tiempos(r);return `<div class="item"><div>${tagMaq(r.equipo)} <b>${esc(r.tipoFalla||'Falla')}</b><br><small class="muted">${esc(r.atendidoPor||r.cerradoPor||'')} · respuesta ${durMin(t.resp)} · reparación ${durMin(t.rep)}</small></div>${tagEstado(r.estado)}</div>`}).join(''):'<p class="muted">Ninguna todavía.</p>'}</div>`};
+function estadoTile(id){const ab=REG.filter(r=>r.equipo===id&&esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(a)-msCreado(b));
+  const pend=ab.filter(fallaPendiente),aten=ab.filter(fallaEnAtencion);
+  if(pend.length){const r=pend[0];return {cls:'rojo',txt:r.severidad==='Paro de línea'?'PARADA':'FALLA REPORTADA',det:esc(r.tipoFalla||'Falla')+' · esperando mecánico',desde:msCreado(r),n:ab.length}}
+  if(aten.length){const r=aten[0];return {cls:'amarillo',txt:'EN ATENCIÓN',det:esc(r.tipoFalla||'Falla')+' · '+esc(r.atendidoPor||'Mecánico'),desde:ms(r.inicioAtencion)||msCreado(r),n:ab.length}}
+  return {cls:'verde',txt:'TRABAJANDO',det:'Sin fallas abiertas',desde:0,n:0}}
+V.tablero=()=>{const est=MAQUINAS.map(m=>estadoTile(m.id)),c=k=>est.filter(e=>e.cls===k).length;
+  return `<div class="tabhead"><h1>🟢 Tablero de producción</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span><button class="sec" id="tableroCompleto">${tableroCompleto?'Salir de pantalla completa':'Pantalla completa'}</button></div></div>
+  <div class="semaforo"><span><i style="background:#1e8a4c"></i>Trabajando: ${c('verde')}</span><span><i style="background:#c8102e"></i>Paradas / con falla: ${c('rojo')}</span><span><i style="background:#f2b705"></i>En atención: ${c('amarillo')}</span></div>
+  ${PLANTAS.map(pl=>{const ms_=maquinasDe(pl);return `<h2>Planta ${esc(pl)}</h2><div class="tablero-prod">${ms_.length?ms_.map(m=>{const e=estadoTile(m.id);return `<div class="maqtile ${e.cls}"><div><h3>${esc(m.zona)}</h3><small>${esc(m.nombre)} · ${esc(m.id)}</small></div><div><div class="est">${e.txt}</div><small>${e.det}</small>${e.desde?`<div class="reloj" data-desde="${e.desde}"></div>`:''}${e.n>1?`<small>${e.n} fallas abiertas</small>`:''}</div></div>`}).join(''):'<div class="maqtile vacia"><div>Todavía no hay líneas registradas en esta planta.</div></div>'}</div>`}).join('')}
+  <p class="muted">Se actualiza solo, en tiempo real. Rojo: falla reportada sin atender · Amarillo: un mecánico ya la está atendiendo · Verde: trabajando.</p>`};
 V.pantalla=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
   return `<div class="tabhead"><h1>🔧 Mantenimiento La Josefina DPC</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span>${sonidoOn?'':'<button id="activarAlertas">🔔 Activar sonido</button>'}<button class="sec" data-v2="${inicioRol()}">Salir de pantalla</button></div></div>
   <div class="grid" style="margin-bottom:18px">${MAQUINAS.map(m=>{const e=estadoMaq(m.id);return `<div class="card kpi"><h2>${esc(m.zona)}</h2><span class="tag ${e.cls}" style="font-size:15px">${esc(e.txt)}</span></div>`}).join('')}${kpi(pend.length,'Sin atender')}${kpi(aten.length,'En atención')}</div>
@@ -595,7 +620,9 @@ function formMant(){
 V.registrar=formMant;
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));
   return `<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
-  <label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${(maqForm||(misLineas()||[])[0])===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>
+  ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
+    if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.zona)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
+    return `<label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>`})()}
   <label for="f_tipo">Tipo de falla</label><select id="f_tipo" required><option value="" selected disabled>Selecciona el tipo de falla…</option>${TIPOS_FALLA.map(t=>`<option>${t}</option>`).join('')}</select>
   <label>¿La línea está detenida?</label><div class="opciones"><label><input type="radio" name="f_paro" value="si" required> Sí, está detenida</label><label><input type="radio" name="f_paro" value="no"> No, sigue trabajando</label></div>
   <label for="f_desc">Descripción del problema</label><textarea id="f_desc" required maxlength="2000" placeholder="Qué pasa, en qué parte de la máquina, qué se observa"></textarea>
@@ -677,7 +704,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
   <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
-  <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></div>
+  <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option value="${r}" ${r===u.rol?'selected':''}>${rolTxt(r)}</option>`).join('')}</select></div>
   <div><label for="u_planta">Planta</label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Todas las líneas de la planta</option>${maquinasDe(u.planta||PLANTAS[0]).map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
@@ -700,7 +727,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="card"><h2>Usuarios registrados (${USUARIOS.length})</h2><label for="u_buscar">Buscar</label><input id="u_buscar" value="${esc(usrFiltro)}" placeholder="Nombre, usuario, número o puesto">
   <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>No. empl.</th><th>Puesto</th><th>Planta / línea</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(u=>{const yo=u.uid===usuario.uid,prot=u.rol===PRINCIPAL;return `<tr>
   <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
-  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(u.rol)}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
+  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
   <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
   <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button></div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
@@ -817,6 +844,7 @@ document.addEventListener('click',async e=>{
   if(b.id==='cerrarVisor'){$('visor').hidden=true;$('visor').innerHTML='';return}
   if(b.id==='activarAlertas'){desbloquearAudio();toast('🔔 Alertas con sonido activadas en este dispositivo.');pintarBanner();if(vista==='pantalla')render(true);return}
   if(b.id==='silenciar'){silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
+  if(b.id==='tableroCompleto'){tableroCompleto=!tableroCompleto;document.body.classList.toggle('modo-pantalla',tableroCompleto);render(true);return}
   if(b.id==='miCuenta'){ir('cuenta');return}
   if(b.closest('#nav')&&b.dataset.v){ir(b.dataset.v);return}
   if(b.dataset.v2){ir(b.dataset.v2);return}
@@ -825,7 +853,8 @@ document.addEventListener('click',async e=>{
   if(b.dataset.finalizar){finalizando=b.dataset.finalizar;render(true);const t=$('z_trab');if(t)t.focus();return}
   if(b.dataset.ficha){maqSel=b.dataset.ficha;ir('ficha');return}
   if(b.dataset.hist){maqSel=b.dataset.hist;render(true);return}
-  if(b.dataset.irmaq){maqForm=maqSel;ir(b.dataset.irmaq,true);if(b.dataset.irmaq==='calendario'){calMaq=maqSel;render(true)}return}
+  if(b.id==='cambiarMaq'){maqFija=null;maqForm=null;$('app').dataset.sucio='';escribirDireccion();render(true);return}
+  if(b.dataset.irmaq){maqForm=maqSel;maqFija=b.dataset.irmaq==='falla'?maqSel:null;ir(b.dataset.irmaq,true);if(b.dataset.irmaq==='calendario'){calMaq=maqSel;render(true)}return}
   if(b.dataset.verabiertos){filtro.maqAb=b.dataset.verabiertos;ir('abiertos');return}
   if(b.dataset.ab){filtro.maqAb=b.dataset.ab;render(true);return}
   if(b.dataset.calmaq){calMaq=b.dataset.calmaq;render(true);return}
@@ -869,8 +898,8 @@ function pintarQR(id,boxId,size){const box=$(boxId);if(!box)return;box.innerHTML
 function qrDataURL(id){const tmp=document.createElement('div');tmp.id='qrtmp';tmp.style.position='absolute';tmp.style.left='-9999px';document.body.appendChild(tmp);pintarQR(id,'qrtmp',512);
   const c=tmp.querySelector('canvas');const m=maq(id);const out=document.createElement('canvas');out.width=640;out.height=760;const g=out.getContext('2d');
   g.fillStyle='#fff';g.fillRect(0,0,640,760);g.imageSmoothingEnabled=false;if(c)g.drawImage(c,64,64,512,512);
-  g.fillStyle='#8f1734';g.font='bold 34px -apple-system,Arial';g.textAlign='center';g.fillText(m.nombre+' · '+m.zona,320,630);
-  g.fillStyle='#1c2833';g.font='26px -apple-system,Arial';g.fillText('La Josefina DPC · Planta '+m.planta+' · '+m.id,320,675);g.font='22px -apple-system,Arial';g.fillText('Escanea para ver la ficha y registrar mantenimiento',320,715);
+  g.fillStyle='#173f80';g.font='bold 34px -apple-system,Arial';g.textAlign='center';g.fillText(m.nombre+' · '+m.zona,320,630);
+  g.fillStyle='#1c2833';g.font='26px -apple-system,Arial';g.fillText('La Josefina DPC · Planta '+m.planta+' · '+m.id,320,675);g.font='22px -apple-system,Arial';g.fillText('Escanea para reportar una falla en esta máquina',320,715);
   tmp.remove();return out.toDataURL('image/png')}
 function bajarQR(id){const a=document.createElement('a');a.href=qrDataURL(id);a.download='QR_La_Josefina_'+maq(id).zona.replace(' ','_')+'.png';document.body.appendChild(a);a.click();a.remove()}
 function imprimirQR(){const w=window.open('','_blank');if(!w){toast('Permite ventanas emergentes para imprimir.');return}

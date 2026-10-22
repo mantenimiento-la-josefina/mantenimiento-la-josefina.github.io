@@ -21,6 +21,7 @@ const ROLES_AVISO = ['Mecánico', 'Supervisor de mantenimiento'];
 const ROLES_ESCALAR = ['Supervisor de mantenimiento', 'Coordinación', PRINCIPAL];
 const MIN_ESCALAR = 10;
 const MAX_ESCALAR = 12; // hasta 2 horas
+const HORAS_AUTOCIERRE = 4;
 const MAQUINAS = {
   'AMP-LA-001': { planta: 'AM Pack', zona: 'Línea A', nombre: 'Envasadora vertical' },
   'AMP-LB-001': { planta: 'AM Pack', zona: 'Línea B', nombre: 'Envasadora vertical' },
@@ -118,8 +119,20 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
   const ahora = Date.now();
   for (const d of snap.docs) {
     const r = d.data();
+    // Si nadie confirma en 4 h, se cierra sola (se toma la hora de fin del mecánico como reanudación)
+    if (r.estado === 'Por confirmar') {
+      const fin = r.finAtencion && r.finAtencion.toMillis ? r.finAtencion.toMillis() : 0;
+      if (fin && ahora - fin > HORAS_AUTOCIERRE * 3600000) {
+        const cambio = { estado: 'Cerrada', fechaCierre: new Date(ahora).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }), confirmadoPor: 'Cierre automático (sin confirmación en ' + HORAS_AUTOCIERRE + ' h)', confirmadoEn: FieldValue.serverTimestamp() };
+        if (r.severidad === 'Paro de línea') cambio.lineaReanudaEn = r.finAtencion;
+        await d.ref.update(cambio);
+        logger.info('Cierre automático', d.id);
+      }
+      continue;
+    }
     if (!['Pendiente', 'Abierta'].includes(r.estado)) continue;
-    const creado = r.creadoEn && r.creadoEn.toMillis ? r.creadoEn.toMillis() : 0;
+    const ref = r.reabiertoEn && r.reabiertoEn.toMillis ? r.reabiertoEn.toMillis() : 0;
+    const creado = ref || (r.creadoEn && r.creadoEn.toMillis ? r.creadoEn.toMillis() : 0);
     const n = r.avisos || 1;
     const yaEsc = r.escalado === true ? 1 : Number(r.escalado || 0);
     if (creado && yaEsc < MAX_ESCALAR && ahora - creado >= (yaEsc + 1) * MIN_ESCALAR * 60000) {
@@ -133,6 +146,32 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
     const out = await avisar(r, d.id, n + 1);
     logger.info('Aviso repetido', d.id, n + 1, out);
   }
+});
+
+// 1c) Falla reabierta por la operadora (❌ sigue fallando) → aviso inmediato a los mecánicos
+exports.avisarReapertura = onDocumentUpdated('registros/{id}', async (event) => {
+  const a = event.data.before.data() || {}, r = event.data.after.data() || {};
+  if (r.tipo !== 'Reporte de falla' || a.estado !== 'Por confirmar' || !['Pendiente', 'Abierta'].includes(r.estado)) return;
+  const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
+  const out = await enviar(await destinosPara(r.equipo, 1), mensaje('🔁 Sigue fallando · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — la operadora indicó que la máquina no quedó bien.', URL_BASE + '#alertas', 'reabierta-' + event.params.id + '-' + (r.reaperturas || 1)));
+  logger.info('Reapertura', event.params.id, out);
+});
+
+// 1d) Refacción llega a su mínimo → aviso a supervisores y Administrador principal
+exports.avisarMinimo = onDocumentUpdated('refacciones/{id}', async (event) => {
+  const a = event.data.before.data() || {}, r = event.data.after.data() || {};
+  const min = Number(r.minimo || 0), antes = Number(a.existencia), ahora = Number(r.existencia);
+  if (!(antes > min && ahora <= min)) return;
+  const tok = await db.collection('tokens').get();
+  const destinos = [];
+  for (const d of tok.docs) {
+    const t = d.data();
+    if (t.expira && Number(t.expira) < Date.now()) continue;
+    const p = await perfilDe(t.uid);
+    if (p && p.activo === true && [PRINCIPAL, 'Supervisor de mantenimiento'].includes(p.rol)) destinos.push(d.id);
+  }
+  const out = await enviar(destinos, mensaje('📦 Refacción en mínimo', (r.nombre || 'Refacción') + ': quedan ' + ahora + ' ' + (r.unidad || '') + ' (mínimo ' + min + ').', URL_BASE + '#inventario', 'minimo-' + event.params.id));
+  logger.info('Mínimo de refacción', event.params.id, out);
 });
 
 // 2) Cuenta desactivada/activada en el panel → se bloquea o desbloquea el acceso en el sistema de autenticación

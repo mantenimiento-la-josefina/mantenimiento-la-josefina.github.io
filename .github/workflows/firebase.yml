@@ -50,6 +50,16 @@ jobs:
             if gcloud run services add-iam-policy-binding $f --region us-central1 --project mantenimiento-la-josefina --member=allUsers --role=roles/run.invoker -q >/dev/null 2>err.txt; then echo "::notice::$f abierto"; else echo "::error::$f: $(tail -1 err.txt)"; fi
           done
           echo "::notice::Después: crearUsuario responde HTTP $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' $U)"
+      - name: Respaldo semanal de la base de datos
+        if: steps.cred.outputs.ok == 'true'
+        run: |
+          P=mantenimiento-la-josefina
+          if gcloud firestore backups schedules list --database='(default)' --project $P --format='value(name)' 2>/dev/null | grep -q .; then
+            echo "::notice::Respaldo semanal ya estaba configurado"
+          else
+            if gcloud firestore backups schedules create --database='(default)' --recurrence=weekly --day-of-week=SUN --retention=8w --project $P -q >/dev/null 2>err.txt; then echo "::notice::Respaldo semanal creado (domingos, 8 semanas)"; else echo "::error::Respaldo: $(tail -2 err.txt | tr '\n' ' ')"; fi
+          fi
+          gcloud firestore backups schedules list --database='(default)' --project $P --format='value(recurrence,retention,weeklyRecurrence.day)' 2>/dev/null | while IFS= read -r l; do echo "::notice::Programación de respaldo: $l"; done
       - name: Bloquear registro libre de cuentas
         if: steps.cred.outputs.ok == 'true' && hashFiles('herramientas/bloquear-registro.activo') != ''
         run: npm ci --no-audit --no-fund && node bloquear-registro.js

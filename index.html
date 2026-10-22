@@ -139,6 +139,10 @@ body.modo-pantalla .wrap{max-width:none}
 .tabhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .tabhead h1{margin:0;font-size:26px}
 .hora{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.confirmar2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.confirmar2 button{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:44px;padding:16px 10px;border-radius:16px;line-height:1}
+.confirmar2 button span{font-size:20px;font-weight:800}
+.confirmar2 .si{background:#1e8a4c;color:#fff}.confirmar2 .no{background:#c8102e;color:#fff}
 /* Tablero de producción */
 .tablero-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:22px}
 .maqtile{border-radius:16px;padding:18px;color:#fff;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;box-shadow:0 4px 16px #0002}
@@ -245,27 +249,29 @@ const PLANTAS = ['AM Pack','CIC','Ricaty','Flexi Pack'];
 function maquinasDe(pl){return MAQUINAS.filter(m=>m.planta===pl)}
 const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Coordinación':'plan','Ingeniero de procesos':'plan','Supervisor de mantenimiento':'warn','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
+const POR_CONFIRMAR = 'Por confirmar';
+const HORAS_AUTOCIERRE = 4;
 const PENDIENTES = ['Pendiente','Abierta'];
 const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','cuenta'],
+  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
   'Administrador':['usuarios','cuenta'],
-  direccion:['tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','cuenta'],
+  direccion:['tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
   coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
-  'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','cuenta'],
-  'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','cuenta'],
+  'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','inventario','cuenta'],
+  'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','inventario','cuenta'],
   'Ingeniero de procesos':['tablero','falla','historial','indicadores','ficha','cuenta'],
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
-  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento']],
+  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Administrador':[['usuarios','👥 Alta de usuarios']],
-  direccion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios']],
+  direccion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios'],['inventario','📦 Inventario']],
   coordinacion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores']],
-  'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento']],
-  'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento']],
+  'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
+  'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Ingeniero de procesos':[['falla','🚨 Reportar falla'],['tablero','🟢 Tablero de producción'],['historial','📋 Historial de ajustes y reparaciones'],['indicadores','Indicadores']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
@@ -278,7 +284,7 @@ let REG=[], PROG=[], MAQCFG={}, USUARIOS=[];
 let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
-let estabaOcupado=false, escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
+let ESTADO_PREV={}, estabaOcupado=false, escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
 let audioCtx=null, sonidoOn=false, silencioHasta=0, ultimoSonido=0, wakeLock=null;
 
 // ===== Utilidades =====
@@ -297,7 +303,7 @@ function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout
 function maq(id){return MAQUINAS.find(m=>m.id===id)}
 function maqPorClave(c){return MAQUINAS.find(m=>m.clave===String(c||'').toUpperCase())}
 function tagMaq(id){const m=maq(id);if(!m)return `<span class="tag neu">${esc(id)}</span>`;return `<span class="tag ${m.clave==='A'?'la':'lb'}">${esc(m.zona)}</span>`}
-function tagEstado(e){if(CERRADOS.includes(e))return `<span class="tag">${esc(e)}</span>`;if(EN_ATENCION.includes(e))return `<span class="tag warn">${esc(e)}</span>`;return `<span class="tag bad">${esc(e||'Pendiente')}</span>`}
+function tagEstado(e){if(e===POR_CONFIRMAR)return `<span class="tag plan">Por confirmar</span>`;if(CERRADOS.includes(e))return `<span class="tag">${esc(e)}</span>`;if(EN_ATENCION.includes(e))return `<span class="tag warn">${esc(e)}</span>`;return `<span class="tag bad">${esc(e||'Pendiente')}</span>`}
 function tagTipo(t){if(t==='Reporte de falla')return `<span class="tag bad">Falla</span>`;if(t==='Correctivo')return `<span class="tag warn">Correctivo</span>`;if(t==='Preventivo')return `<span class="tag plan">Preventivo</span>`;return `<span class="tag neu">${esc(t)}</span>`}
 function activoP(){return !!perfil&&perfil.activo===true}
 function esPrincipal(){return activoP()&&perfil.rol===PRINCIPAL}
@@ -410,10 +416,16 @@ function suscribir(){
   subs.push(db.collection('registros').onSnapshot(s=>{
     if(!usuario||!perfil)return;
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
+    if(!primeraCarga){REG.forEach(r=>{const prev=ESTADO_PREV[r.id];if(!prev||prev===r.estado||!esFalla(r)||!deMiLinea(r))return;
+      if(prev===POR_CONFIRMAR&&PENDIENTES.includes(r.estado)){const m=maq(r.equipo);if(insiste()&&!ocupado()){nuevaFalla(r)}else if(avisa()){sirenaSuave(true)}if(conAlertas())toast('🔁 La falla de '+(m?m.zona:'')+' se reabrió: sigue fallando.')}
+      if(r.estado===POR_CONFIRMAR&&['Operador','Ingeniero de procesos'].includes(perfil.rol)){const m=maq(r.equipo);sirenaSuave(true);toast('🔧 La '+(m?m.zona:'máquina')+' ya fue reparada. Confirma si quedó bien.')}})}
+    ESTADO_PREV={};REG.forEach(r=>ESTADO_PREV[r.id]=r.estado);
     if(!primeraCarga&&avisa()){const nv=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nv.length){sirenaSuave(true);const m=maq(nv[0].equipo);toast('🚨 Nueva falla en '+(m?m.zona:nv[0].equipo)+': '+(nv[0].tipoFalla||''));parpadearTitulo()}}
     if(!primeraCarga&&insiste()&&!ocupado()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
     const eraPrimera=primeraCarga;primeraCarga=false;const oc=ocupado(),libero=estabaOcupado&&!oc;estabaOcupado=oc;if(libero&&insiste()&&misPendientes().length)setTimeout(abrirAlarma,0);pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
+  if(verInventario()||puedeRegistrar()){subs.push(db.collection('refacciones').onSnapshot(s=>{REF=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
+    if(esAdmin()||grupo()==='direccion'){let q=db.collection('movimientos');try{if(q.orderBy)q=q.orderBy('fecha','desc').limit(80)}catch(e){}subs.push(q.onSnapshot(s=>{MOV=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()},err))}}
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
 }
@@ -546,8 +558,8 @@ let ENTERADO=new Set(LS.get('dpc_enterado',[])),ultimoSuave=0;
 const MIN_ESCALAR=10;
 function marcarEnterado(ids){ids.forEach(i=>ENTERADO.add(i));LS.set('dpc_enterado',[...ENTERADO].slice(-400));pintarBanner()}
 function pendSinEnterar(){return avisa()?misPendientes().filter(r=>!ENTERADO.has(r.id)):[]}
-function escaladas(){if(!recibeEsc())return [];return REG.filter(r=>fallaPendiente(r)&&deMiLinea(r)&&Date.now()-msCreado(r)>=MIN_ESCALAR*60000).sort((a,b)=>msCreado(a)-msCreado(b))}
-function bloqueEsc(r){return Math.floor((Date.now()-msCreado(r))/(MIN_ESCALAR*60000))}
+function escaladas(){if(!recibeEsc())return [];return REG.filter(r=>fallaPendiente(r)&&deMiLinea(r)&&Date.now()-msRef(r)>=MIN_ESCALAR*60000).sort((a,b)=>msRef(a)-msRef(b))}
+function bloqueEsc(r){return Math.floor((Date.now()-msRef(r))/(MIN_ESCALAR*60000))}
 function escSinEnterar(){return escaladas().filter(r=>!ENTERADO.has(r.id+'-esc'+bloqueEsc(r)))}
 function sirenaSuave(ya){if(!sonidoOn||!audioCtx)return;ultimoSuave=Date.now();
   try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
@@ -582,9 +594,10 @@ function registros(id){return deMaq(REG,id||'todas').filter(r=>maq(r.equipo)).sl
 function programa(id){return deMaq(PROG,id||'todas').slice().sort((a,b)=>a.fecha.localeCompare(b.fecha))}
 function estadoMaq(id){
   const ab=registros(id).filter(abierto);
-  if(ab.some(r=>esFalla(r)&&r.severidad==='Paro de línea'))return {txt:'Detenida',cls:'bad',det:'Falla abierta con paro de línea'};
+  if(ab.some(r=>esFalla(r)&&r.severidad==='Paro de línea'&&r.estado!==POR_CONFIRMAR))return {txt:'Detenida',cls:'bad',det:'Falla abierta con paro de línea'};
   if(ab.some(fallaEnAtencion))return {txt:'En reparación',cls:'warn',det:'Un mecánico está atendiendo una falla'};
-  if(ab.some(esFalla))return {txt:'Operando con falla reportada',cls:'warn',det:'Hay fallas sin atender'};
+  if(ab.some(r=>fallaPendiente(r)))return {txt:'Operando con falla reportada',cls:'warn',det:'Hay fallas sin atender'};
+  if(ab.some(fallaPorConfirmar))return {txt:'Reparada · por confirmar',cls:'plan',det:'Falta que la operadora confirme que quedó bien'};
   if(ab.some(r=>EN_ATENCION.includes(r.estado)))return {txt:'En mantenimiento',cls:'warn',det:'Trabajo en proceso'};
   return {txt:'Operando',cls:'',det:'Sin fallas abiertas'};
 }
@@ -596,7 +609,12 @@ function proximo(id){
   if(f>0&&ult){const fe=sumarDias(ult.fecha,f);return {fecha:fe,txt:'Preventivo según frecuencia ('+f+' días)',vencido:fe<hs}}
   return null;
 }
-function tiempos(r){const c=msCreado(r),i=ms(r.inicioAtencion),f=ms(r.finAtencion);return {resp:i&&c?i-c:null,rep:f&&i?f-i:null,total:f&&c?f-c:null}}
+function msRef(r){return ms(r.reabiertoEn)||msCreado(r)}
+function tiempos(r){const c=msCreado(r),rf=msRef(r),i=ms(r.inicioAtencion),f=ms(r.finAtencion);return {resp:i&&rf?i-rf:null,rep:f&&i?f-i:null,total:f&&c?f-c:null}}
+function fallaPorConfirmar(r){return esFalla(r)&&r.estado===POR_CONFIRMAR}
+function paroReal(r){if(!esFalla(r)||r.severidad!=='Paro de línea')return null;const a=msCreado(r),b=ms(r.lineaReanudaEn);return a&&b&&b>a?b-a:null}
+function puedeConfirmar(){return activoP()&&['Operador','Ingeniero de procesos',PRINCIPAL,'Supervisor de mantenimiento'].includes(perfil.rol)}
+function verInventario(){return vistasPermitidas().includes('inventario')}
 
 // ===== Componentes =====
 function fotosBtn(ids,txt){return ids&&ids.length?`<button class="mini sec" data-fotos="${esc(ids.join(','))}">📷 ${txt||'Ver fotos'} (${ids.length})</button>`:''}
@@ -605,6 +623,9 @@ function detalleFalla(r){if(!esFalla(r))return '';const t=tiempos(r);let h='';
   if(t.resp!=null||t.rep!=null)h+=`<br><small class="muted">Respuesta: ${durMin(t.resp)} · Reparación: ${durMin(t.rep)} · Total: ${durMin(t.total)}</small>`;
   if(r.trabajoRealizado)h+=`<br><small><b>Trabajo realizado:</b> ${esc(r.trabajoRealizado)}</small>`;
   if(r.ajustes)h+=`<br><small><b>Ajustes:</b> ${esc(r.ajustes)}</small>`;
+  if(r.confirmadoPor)h+=`<br><small class="muted">Confirmó: ${esc(r.confirmadoPor)}${ms(r.confirmadoEn)?' · '+hhmm(ms(r.confirmadoEn)):''}</small>`;
+  const pr=paroReal(r);if(pr!=null)h+=`<br><small><b>Paro real de línea:</b> ${durMin(pr)} (volvió a producir ${hhmm(ms(r.lineaReanudaEn))})</small>`;
+  if(r.reaperturas)h+=`<br><small class="muted">Reabierta ${r.reaperturas} vez/veces por seguir fallando${r.notaReapertura?': «'+esc(r.notaReapertura)+'»':''}</small>`;
   return h}
 function filas(arr,opc={}){
   const acc=opc.acciones&&esAdmin();
@@ -631,10 +652,37 @@ function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=
   ${r.fotos&&r.fotos.length?'<div class="acciones" style="margin-top:8px">'+fotosBtn(r.fotos)+'</div>':''}
   ${opc.acciones&&atiende()?(PENDIENTES.includes(r.estado)?(insiste()?`<div class="acciones"><button class="falla xl" id="abrirEscaner">📷 Escanear QR para atender</button></div><small class="muted">La falla se toma a tu nombre al escanear el código de la máquina.</small>`:`<div class="acciones"><button class="falla xl" data-atender="${esc(r.id)}">Atender falla</button></div>`):mia&&finalizando!==r.id?`<div class="acciones"><button class="xl" data-finalizar="${esc(r.id)}">Finalizar trabajo</button></div>`:''):''}
   ${mia&&finalizando===r.id?formFinalizar(r):''}</div>`}
+let REF=[],MOV=[],invFiltro='',invEdit=null,invAlta=false,importPrev=null;
+function refOpciones(){return REF.slice().sort((a,b)=>String(a.nombre).localeCompare(b.nombre)).map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}${x.codigo?' · '+esc(x.codigo):''} (hay ${Number(x.existencia)||0} ${esc(x.unidad||'')})</option>`).join('')}
+function selRefacciones(){if(!REF.length)return '';return `<div class="refsel"><label>Refacciones del inventario</label><div class="refrows"></div><button type="button" class="mini sec agregaRef">+ Agregar refacción usada</button><small class="muted" style="display:block;margin-top:4px">Se descuentan del inventario al guardar.</small></div>`}
+function filaRef(){return `<div class="refrow dos" style="grid-template-columns:1fr 90px auto;align-items:end"><div><select class="rf-id"><option value="">Elige la refacción…</option>${refOpciones()}</select></div><div><input class="rf-cant" type="number" inputmode="decimal" min="0.01" step="any" value="1" aria-label="Cantidad"></div><button type="button" class="mini peligro quitaRef" style="margin-bottom:2px">✕</button></div>`}
+function leerRefs(form){const out=[];form.querySelectorAll('.refrow').forEach(rw=>{const id=rw.querySelector('.rf-id').value,c=Number(rw.querySelector('.rf-cant').value);if(id&&c>0){const x=REF.find(y=>y.id===id);if(x)out.push({id,codigo:x.codigo||'',nombre:x.nombre,unidad:x.unidad||'',cantidad:c})}});return out}
+function faltante(lista){const x=lista.find(y=>{const z=REF.find(w=>w.id===y.id);return y.cantidad>(Number(z&&z.existencia)||0)});if(!x)return '';const z=REF.find(w=>w.id===x.id);return 'Solo hay '+(Number(z&&z.existencia)||0)+' '+(z&&z.unidad||'')+' de «'+x.nombre+'» en inventario. Corrige la cantidad o avisa al supervisor para que registre la entrada.'}
+function textoRefs(lista,libre){return [lista.map(x=>x.nombre+' ×'+x.cantidad+(x.unidad?' '+x.unidad:'')).join(', '),libre].filter(Boolean).join(' · ')}
+async function descontarRefs(lista,registroId,equipo){if(!lista.length)return;const batch=db.batch();
+  lista.forEach(x=>{batch.update(db.collection('refacciones').doc(x.id),{existencia:fb.firestore.FieldValue.increment(-x.cantidad),actualizado:TS()});
+    batch.set(db.collection('movimientos').doc(),{refaccion:x.id,codigo:x.codigo,nombre:x.nombre,tipo:'Salida',cantidad:x.cantidad,registro:registroId,equipo:equipo||'',uid:usuario.uid,usuario:perfil.nombre,fecha:TS()})});
+  await batch.commit()}
+document.addEventListener('click',e=>{const a=e.target.closest('.agregaRef');if(a){a.closest('.refsel').querySelector('.refrows').insertAdjacentHTML('beforeend',filaRef());$('app').dataset.sucio='1';return}const q=e.target.closest('.quitaRef');if(q){q.closest('.refrow').remove()}});
+function tarjetaConfirmar(r){const m=maq(r.equipo);
+  return `<div class="fcard" style="border-left-color:var(--plan)"><h3>${esc(m?m.planta+' · '+m.zona:r.equipo)}</h3>
+  <p style="margin:0 0 4px"><b>${esc(r.tipoFalla||'Falla')}</b> · reparó ${esc(r.atendidoPor||'')}${ms(r.finAtencion)?' a las '+hhmm(ms(r.finAtencion)):''}</p>
+  ${puedeConfirmar()?`<p style="margin:10px 0 8px;font-size:18px;font-weight:700">¿La máquina quedó bien?</p>
+  <div class="confirmar2"><button class="si" data-conf="si" data-id="${esc(r.id)}" aria-label="Sí, quedó bien">✅<span>Sí</span></button><button class="no" data-conf="no" data-id="${esc(r.id)}" aria-label="No, sigue fallando">❌<span>No</span></button></div>`
+  :'<p class="muted" style="margin:8px 0 0">Esperando que la operadora confirme.</p>'}</div>`}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-conf]');if(!b)return;const r=REG.find(x=>x.id===b.dataset.id);if(!r||r.estado!==POR_CONFIRMAR)return;
+  b.closest('.confirmar2').querySelectorAll('button').forEach(x=>x.disabled=true);const FV=fb.firestore.FieldValue;
+  try{if(b.dataset.conf==='si'){const d={estado:'Cerrada',fechaCierre:hoy(),confirmadoPor:perfil.nombre,confirmadoUid:usuario.uid,confirmadoEn:TS()};if(r.severidad==='Paro de línea')d.lineaReanudaEn=TS();
+      await db.collection('registros').doc(r.id).update(d);toast('✅ Listo. La falla quedó cerrada.')}
+    else{await db.collection('registros').doc(r.id).update({estado:'Pendiente',reaperturas:(r.reaperturas||0)+1,intentos:FV.arrayUnion({atendidoPor:r.atendidoPor||'',inicio:ms(r.inicioAtencion)||0,fin:ms(r.finAtencion)||0,trabajo:r.trabajoRealizado||''}),
+      atendidoUid:FV.delete(),atendidoPor:FV.delete(),inicioAtencion:FV.delete(),finAtencion:FV.delete(),trabajoRealizado:FV.delete(),ajustes:FV.delete(),reabiertoPor:perfil.nombre,reabiertoEn:TS(),avisos:FV.delete(),escalado:FV.delete()});
+      toast('❌ Se avisó a los mecánicos que sigue fallando.')}}
+  catch(er){toast(errTxt(er));b.closest('.confirmar2').querySelectorAll('button').forEach(x=>x.disabled=false)}});
 function formFinalizar(r){return `<form id="fFinalizar" data-id="${esc(r.id)}" style="margin-top:10px"><label for="z_trab">Trabajo realizado</label><textarea id="z_trab" required maxlength="2000"></textarea>
   <label for="z_aj">Ajustes efectuados</label><textarea id="z_aj" maxlength="2000" style="min-height:70px"></textarea>
-  <label for="z_ref">Refacciones utilizadas (si aplica)</label><input id="z_ref" maxlength="250">
+  ${selRefacciones()}<label for="z_ref">${REF.length?'Otras refacciones (texto libre)':'Refacciones utilizadas (si aplica)'}</label><input id="z_ref" maxlength="250">
   <label for="z_fotos">Fotografías (opcional, hasta 3)</label><input id="z_fotos" type="file" accept="image/*" multiple>
+  <p class="muted" style="margin:10px 0 0">Al finalizar, la operadora de la línea confirmará que la máquina quedó bien.</p>
   <div class="acciones"><button type="submit" class="xl">Guardar y finalizar</button><button type="button" class="sec" id="cancelFin">Cancelar</button></div><div id="zErr"></div></form>`}
 
 // ===== Vistas =====
@@ -656,11 +704,13 @@ V.alertas=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msC
   return `${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
   <h2>Fallas sin atender (${pend.length})</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0">No hay fallas pendientes. Cuando una operadora reporte una, aparecerá aquí al instante con alerta y sonido.</p></div>'}
   ${otras.length?`<h2>En atención por otros mecánicos</h2>${otras.map(r=>tarjetaFalla(r)).join('')}`:''}
+  ${(()=>{const pc=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r));return pc.length?`<h2>Reparadas · esperando confirmación (${pc.length})</h2>${pc.map(tarjetaConfirmar).join('')}`:''})()}
   <div class="card"><h2>Atendidas hoy (${hoyCerr.length})</h2>${hoyCerr.length?hoyCerr.map(r=>{const t=tiempos(r);return `<div class="item"><div>${tagMaq(r.equipo)} <b>${esc(r.tipoFalla||'Falla')}</b><br><small class="muted">${esc(r.atendidoPor||r.cerradoPor||'')} · respuesta ${durMin(t.resp)} · reparación ${durMin(t.rep)}</small></div>${tagEstado(r.estado)}</div>`}).join(''):'<p class="muted">Ninguna todavía.</p>'}</div>`};
 function estadoTile(id){const ab=REG.filter(r=>r.equipo===id&&esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(a)-msCreado(b));
   const pend=ab.filter(fallaPendiente),aten=ab.filter(fallaEnAtencion);
-  if(pend.length){const r=pend[0];return {cls:'rojo',txt:r.severidad==='Paro de línea'?'PARADA':'FALLA REPORTADA',det:esc(r.tipoFalla||'Falla')+' · esperando mecánico',desde:msCreado(r),n:ab.length}}
+  if(pend.length){const r=pend[0];return {cls:'rojo',txt:r.severidad==='Paro de línea'?'PARADA':'FALLA REPORTADA',det:esc(r.tipoFalla||'Falla')+(r.reaperturas?' · reabierta':'')+' · esperando mecánico',desde:msRef(r),n:ab.length}}
   if(aten.length){const r=aten[0];return {cls:'amarillo',txt:'EN ATENCIÓN',det:esc(r.tipoFalla||'Falla')+' · '+esc(r.atendidoPor||'Mecánico'),desde:ms(r.inicioAtencion)||msCreado(r),n:ab.length}}
+  const pc=ab.filter(fallaPorConfirmar);if(pc.length){const r=pc[0];return {cls:'amarillo',txt:'POR CONFIRMAR',det:'Reparada por '+esc(r.atendidoPor||'mecánico')+' · falta confirmación',desde:ms(r.finAtencion)||msCreado(r),n:ab.length}}
   return {cls:'verde',txt:'TRABAJANDO',det:'Sin fallas abiertas',desde:0,n:0}}
 V.tablero=()=>{const est=MAQUINAS.map(m=>estadoTile(m.id)),c=k=>est.filter(e=>e.cls===k).length;
   return `<div class="tabhead"><h1>🟢 Tablero de producción</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span><button class="sec" id="tableroCompleto">${tableroCompleto?'Salir de pantalla completa':'Pantalla completa'}</button></div></div>
@@ -701,15 +751,15 @@ function formMant(){
   ${fallaEd?`<label for="m_tf">Tipo de falla</label><select id="m_tf">${TIPOS_FALLA.map(t=>`<option ${ed.tipoFalla===t?'selected':''}>${t}</option>`).join('')}</select>`:''}
   <label for="m_act">${fallaEd?'Descripción del problema':'Descripción de las actividades realizadas'}</label><textarea id="m_act" required maxlength="2000">${esc(pf.actividad||'')}</textarea>
   ${fallaEd?`<label for="m_trab">Trabajo realizado</label><textarea id="m_trab" maxlength="2000">${esc(ed.trabajoRealizado||'')}</textarea><label for="m_aj">Ajustes efectuados</label><textarea id="m_aj" maxlength="2000">${esc(ed.ajustes||'')}</textarea>`:''}
-  <label for="m_ref">Refacciones utilizadas</label><input id="m_ref" maxlength="250" value="${esc(pf.refacciones||'')}" placeholder="Ej. Resistencia de sellado, banda">
+  ${ed?'':selRefacciones()}<label for="m_ref">${!ed&&REF.length?'Otras refacciones (texto libre)':'Refacciones utilizadas'}</label><input id="m_ref" maxlength="250" value="${esc(pf.refacciones||'')}" placeholder="Ej. Resistencia de sellado, banda">
   <div class="dos"><div><label for="m_min">Duración en minutos</label><input id="m_min" type="number" inputmode="numeric" min="0" max="100000" value="${esc(pf.minutos||'')}"></div>
-  <div><label for="m_est">Estado</label><select id="m_est">${(fallaEd?['Pendiente','En atención','Cerrada']:['Completado','En proceso','Pendiente']).map(o=>`<option ${pf.estado===o||(fallaEd&&o==='Pendiente'&&pf.estado==='Abierta')||(fallaEd&&o==='En atención'&&pf.estado==='En proceso')?'selected':''}>${o}</option>`).join('')}</select></div></div>
+  <div><label for="m_est">Estado</label><select id="m_est">${(fallaEd?['Pendiente','En atención',POR_CONFIRMAR,'Cerrada']:['Completado','En proceso','Pendiente']).map(o=>`<option ${pf.estado===o||(fallaEd&&o==='Pendiente'&&pf.estado==='Abierta')||(fallaEd&&o==='En atención'&&pf.estado==='En proceso')?'selected':''}>${o}</option>`).join('')}</select></div></div>
   <label for="m_obs">Observaciones</label><textarea id="m_obs" maxlength="2000">${esc(pf.observaciones||'')}</textarea>
   <div class="acciones"><button type="submit">${ed?'Guardar cambios':'Guardar registro'}</button>${ed?'<button type="button" class="sec" data-v2="trabajos">Cancelar</button>':''}</div><div id="fErr"></div></form></div>`;
 }
 V.registrar=()=>!editId&&!puedeRegistrar()?'<div class="card"><h2>Registrar trabajo</h2><p>Los trabajos los registran los mecánicos. Desde «Trabajos registrados» puedes corregir o cerrar un registro con el botón Editar.</p></div>':formMant();
-V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));
-  return `<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
+V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));const porConf=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r)).sort((a,b)=>(ms(a.finAtencion)||0)-(ms(b.finAtencion)||0));
+  return `${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
   ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
     if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.zona)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
     return `<label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>`})()}
@@ -778,7 +828,12 @@ V.indicadores=()=>{
   const porMec={};fallas.filter(r=>r.atendidoPor&&!abierto(r)).forEach(r=>porMec[r.atendidoPor]=(porMec[r.atendidoPor]||0)+1);
   const meses=[],d=new Date();for(let i=5;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);meses.push({k:iso(x).slice(0,7),t:x.toLocaleDateString('es-MX',{month:'short',year:'2-digit'})})}
   const porMes={};meses.forEach(mm=>porMes[mm.t]=regs.filter(r=>(r.fecha||'').slice(0,7)===mm.k).length);
-  return `${selMaq(indMaq,'indmaq',true)}<h2>Atención de fallas</h2>
+  const paros=fallas.map(paroReal).filter(x=>x!=null),paroTot=paros.reduce((a,b)=>a+b,0);const porMaqParo={};MAQUINAS.forEach(m=>{const v=registros(m.id).map(paroReal).filter(x=>x!=null).reduce((a,b)=>a+b,0);porMaqParo[m.zona]=Math.round(v/60000)});
+  const reab=fallas.filter(r=>r.reaperturas).length,conf=fallas.filter(r=>r.confirmadoPor&&!String(r.confirmadoPor).startsWith('Cierre automático')).length;
+  return `${selMaq(indMaq,'indmaq',true)}<h2>Paro real de línea</h2>
+  <div class="grid">${kpi(paros.length?durMin(paroTot):'—','Paro real total (del reporte a que vuelve a producir)')}${kpi(paros.length?durMin(paroTot/paros.length):'—','Paro real promedio por falla')}${kpi(conf,'Reparaciones confirmadas por operadora')}${kpi(reab,'Fallas reabiertas (no quedaron bien)')}</div>
+  <div class="card"><h2>Minutos de paro real por máquina</h2>${barras(porMaqParo,'Sin paros registrados todavía.')}</div>
+  <h2>Atención de fallas</h2>
   <div class="grid">${kpi(fallas.length,'Fallas reportadas')}${kpi(durMin(tResp),'Tiempo promedio de respuesta (reporte → inicio)')}${kpi(durMin(tRep),'Tiempo promedio de reparación')}${kpi(durMin(tTot),'Tiempo total promedio de atención')}</div>
   <div class="grid">${kpi(comp,'Intervenciones finalizadas')}${kpi(n,'Intervenciones registradas')}${kpi(mtbf==null?'—':(mtbf/86400000).toFixed(1)+' días','MTBF · tiempo medio entre fallas')}${kpi(cumpl===null?'—':cumpl+'%','Cumplimiento del programa preventivo')}</div>
   <div class="grid2"><div class="card"><h2>Fallas por máquina</h2>${barras(porMaq,'Sin fallas.')}</div><div class="card"><h2>Fallas más frecuentes</h2>${barras(porTipoFalla,'Sin fallas registradas.')}</div></div>
@@ -787,6 +842,48 @@ V.indicadores=()=>{
   <div class="grid">${kpi(minutos,'Minutos de mantenimiento registrados')}${kpi(paro,'Minutos de paro capturados')}${kpi(n?Math.round(100*comp/n)+'%':'—','Registros finalizados')}</div>
   <p class="muted">Los tiempos se calculan con la hora del reporte, la hora en que un mecánico presiona «Atender falla» y la hora en que presiona «Finalizar trabajo». Las fallas registradas antes de esta versión no tienen esos tiempos.</p>`;
 };
+// ===== Inventario de refacciones =====
+function bajoMinimo(x){return Number(x.existencia)<=Number(x.minimo||0)}
+function formRef(x){const nuevo=!x;x=x||{};return `<div class="card"><h2>${nuevo?'Agregar refacción':'Editar · '+esc(x.nombre)}</h2><form id="fRef" data-id="${esc(x.id||'')}">
+  <div class="dos"><div><label for="r_cod">Código</label><input id="r_cod" maxlength="40" value="${esc(x.codigo||'')}"></div><div><label for="r_nom">Refacción</label><input id="r_nom" required maxlength="120" value="${esc(x.nombre||'')}"></div></div>
+  <div class="dos"><div><label for="r_uni">Unidad</label><input id="r_uni" maxlength="20" value="${esc(x.unidad||'pza')}"></div><div><label for="r_ubi">Ubicación</label><input id="r_ubi" maxlength="60" value="${esc(x.ubicacion||'')}"></div></div>
+  <div class="dos"><div>${nuevo?`<label for="r_exi">Existencia</label><input id="r_exi" type="number" step="any" min="0" required value="0">`:`<label>Existencia actual</label><input value="${Number(x.existencia)||0}" disabled>`}</div><div><label for="r_min">Mínimo (avisar al llegar a)</label><input id="r_min" type="number" step="any" min="0" value="${esc(x.minimo??1)}"></div></div>
+  ${nuevo?'':`<div class="dos"><div><label for="r_ent">Entrada (+ piezas que llegaron)</label><input id="r_ent" type="number" step="any" min="0" placeholder="0"></div><div><label for="r_aju">O ajustar existencia a</label><input id="r_aju" type="number" step="any" min="0" placeholder="Conteo físico"></div></div>`}
+  <div class="acciones"><button type="submit">${nuevo?'Agregar':'Guardar'}</button><button type="button" class="sec" id="cancelRef">Cancelar</button></div><div id="rErr2"></div></form></div>`}
+V.inventario=()=>{const q=invFiltro.toLowerCase();const lista=REF.filter(x=>!q||[x.codigo,x.nombre,x.ubicacion].join(' ').toLowerCase().includes(q)).sort((a,b)=>(bajoMinimo(b)-bajoMinimo(a))||String(a.nombre).localeCompare(b.nombre));
+  const bajos=REF.filter(bajoMinimo),ed=invEdit?REF.find(x=>x.id===invEdit):null,ges=esAdmin();
+  return `<h2>📦 Inventario de refacciones</h2>
+  <div class="grid">${kpi(REF.length,'Refacciones registradas')}${kpi(bajos.length,'En mínimo o agotadas')}</div>
+  ${bajos.length?`<div class="warning"><b>⚠️ Refacciones en mínimo:</b> ${bajos.slice(0,8).map(x=>esc(x.nombre)+' ('+(Number(x.existencia)||0)+')').join(' · ')}${bajos.length>8?' …':''}</div>`:''}
+  ${ges?(ed?formRef(ed):invAlta?formRef(null):`<div class="acciones" style="margin:0 0 16px"><button id="altaRef">+ Agregar refacción</button><label class="btn sec" for="archivoInv" style="margin:0">📥 Cargar desde Excel o CSV</label><input id="archivoInv" type="file" accept=".xlsx,.xls,.csv,text/csv" hidden></div>`):''}
+  ${importPrev?`<div class="card"><h2>Revisar carga</h2><p>Se encontraron <b>${importPrev.filas.length}</b> refacciones en «${esc(importPrev.archivo)}»: ${importPrev.nuevas} nuevas y ${importPrev.filas.length-importPrev.nuevas} que ya existen (se actualizan su existencia y datos).</p>
+    <div class="scroll"><table><thead><tr><th>Código</th><th>Refacción</th><th>Existencia</th><th>Mínimo</th><th>Unidad</th><th>Ubicación</th></tr></thead><tbody>${importPrev.filas.slice(0,8).map(f=>`<tr><td>${esc(f.codigo)}</td><td>${esc(f.nombre)}</td><td class="num">${f.existencia}</td><td class="num">${f.minimo}</td><td>${esc(f.unidad)}</td><td>${esc(f.ubicacion)}</td></tr>`).join('')}</tbody></table></div>${importPrev.filas.length>8?`<p class="muted">… y ${importPrev.filas.length-8} más.</p>`:''}
+    <div class="acciones"><button id="confirmaImport">Cargar ${importPrev.filas.length} refacciones</button><button class="sec" id="cancelaImport">Cancelar</button></div></div>`:''}
+  <div class="card"><h2>Existencias</h2>${REF.length?`<label for="inv_buscar">Buscar</label><input id="inv_buscar" value="${esc(invFiltro)}" placeholder="Código, nombre o ubicación">
+  <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Código</th><th>Refacción</th><th>Existencia</th><th>Mínimo</th><th>Ubicación</th>${ges?'<th></th>':''}</tr></thead><tbody>${lista.map(x=>`<tr>
+  <td>${esc(x.codigo||'—')}</td><td>${esc(x.nombre)}</td><td class="num">${bajoMinimo(x)?`<span class="tag bad">${Number(x.existencia)||0} ${esc(x.unidad||'')}</span>`:`${Number(x.existencia)||0} ${esc(x.unidad||'')}`}</td><td class="num">${Number(x.minimo)||0}</td><td>${esc(x.ubicacion||'')}</td>
+  ${ges?`<td><div class="acciones" style="margin:0"><button class="mini sec" data-editref="${esc(x.id)}">Editar / entrada</button><button class="mini peligro" data-borraref="${esc(x.id)}">Eliminar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`
+  :`<p class="muted">Todavía no hay refacciones registradas.${ges?' Carga tu inventario con el botón «Cargar desde Excel o CSV». El archivo necesita una fila de títulos con estas columnas: <b>Código, Refacción, Existencia, Mínimo, Unidad, Ubicación</b> (Código, Unidad y Ubicación son opcionales).':''}</p>`}</div>
+  ${(ges||grupo()==='direccion')&&MOV.length?`<div class="card"><h2>Movimientos recientes</h2>${MOV.slice().sort((a,b)=>(ms(b.fecha)||0)-(ms(a.fecha)||0)).slice(0,30).map(m=>`<div class="item"><div><b>${esc(m.nombre||'')}</b> · ${esc(m.tipo)} ${m.cantidad!=null?(m.tipo==='Salida'?'−':'+')+esc(m.cantidad):''}${m.equipo?' · '+tagMaq(m.equipo):''}<br><small class="muted">${esc(m.usuario||'')} · ${ms(m.fecha)?new Date(ms(m.fecha)).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</small></div></div>`).join('')}</div>`:''}`};
+function sinAcentos(t){return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim()}
+const COLS={codigo:['codigo','clave','sku','no. parte','numero de parte','num parte','parte','no parte'],nombre:['refaccion','nombre','descripcion','articulo','pieza','producto'],existencia:['existencia','cantidad','stock','inventario','existencias','cant'],minimo:['minimo','stock minimo','min','punto de reorden','reorden'],unidad:['unidad','um','u.m.','unidad de medida'],ubicacion:['ubicacion','almacen','lugar','anaquel','rack']};
+function mapearFilas(rows){let h=-1,idx={};for(let i=0;i<Math.min(rows.length,10)&&h<0;i++){const fila=(rows[i]||[]).map(sinAcentos);const tmp={};Object.entries(COLS).forEach(([k,al])=>{const j=fila.findIndex(c=>al.includes(c));if(j>=0)tmp[k]=j});if(tmp.nombre!=null){h=i;idx=tmp}}
+  if(h<0)throw new Error('No encontré la columna «Refacción» (o «Nombre» / «Descripción») en la fila de títulos.');
+  const num=v=>{const n=Number(String(v??'').replace(',','.').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n};
+  return rows.slice(h+1).map(f=>({codigo:String(f[idx.codigo]??'').trim(),nombre:String(f[idx.nombre]??'').trim(),existencia:idx.existencia!=null?num(f[idx.existencia]):0,minimo:idx.minimo!=null?num(f[idx.minimo]):1,unidad:idx.unidad!=null?String(f[idx.unidad]??'').trim()||'pza':'pza',ubicacion:idx.ubicacion!=null?String(f[idx.ubicacion]??'').trim():''})).filter(f=>f.nombre)}
+function leerCSV(t){const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':',';const out=[];let fila=[],c='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'&&t[i+1]==='"'){c+='"';i++}else if(ch==='"')q=false;else c+=ch}else if(ch==='"')q=true;else if(ch===sep){fila.push(c);c=''}else if(ch==='\n'){fila.push(c.replace(/\r$/,''));out.push(fila);fila=[];c=''}else c+=ch}
+  if(c||fila.length){fila.push(c);out.push(fila)}return out}
+function cargarSheetJS(){return window.XLSX?Promise.resolve():new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('No se pudo cargar el lector de Excel. Revisa tu internet.'));document.head.appendChild(sc)})}
+async function leerArchivoInv(file){let rows;if(/\.csv$/i.test(file.name)||file.type==='text/csv'){rows=leerCSV(await file.text())}else{await cargarSheetJS();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''})}
+  const filas=mapearFilas(rows);if(!filas.length)throw new Error('El archivo no tiene refacciones debajo de los títulos.');
+  const nuevas=filas.filter(f=>!buscarRef(f)).length;importPrev={archivo:file.name,filas,nuevas};render(true)}
+function buscarRef(f){const c=sinAcentos(f.codigo),n=sinAcentos(f.nombre);return REF.find(x=>(c&&sinAcentos(x.codigo)===c)||(!c&&sinAcentos(x.nombre)===n))}
+async function confirmarImport(btn){btn.disabled=true;btn.textContent='Cargando…';try{const filas=importPrev.filas;
+  for(let i=0;i<filas.length;i+=400){const batch=db.batch();filas.slice(i,i+400).forEach(f=>{const ex=buscarRef(f);const d={codigo:f.codigo,nombre:f.nombre,unidad:f.unidad,existencia:f.existencia,minimo:f.minimo,ubicacion:f.ubicacion,actualizado:TS()};
+    if(ex)batch.update(db.collection('refacciones').doc(ex.id),d);else batch.set(db.collection('refacciones').doc(),d)});await batch.commit()}
+  await db.collection('movimientos').doc().set({tipo:'Carga de archivo',nombre:importPrev.archivo,cantidad:filas.length,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()});
+  toast('📦 '+filas.length+' refacciones cargadas.');importPrev=null;render(true)}catch(e){toast(errTxt(e));btn.disabled=false;btn.textContent='Reintentar'}}
 function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.numEmpleado||u.usuario)));for(let n=r[0]+1;n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
 function nombreLinea(l){if(!l||l==='todas')return 'Todas las líneas';const m=maq(l);return m?m.zona:l}
 let usrEdit=null, usrAlta=false, usrFiltro='';
@@ -834,6 +931,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${finTurno()?`<dt>Sesión</dt><dd>Se cierra a las ${hhmm(finTurno())} (${HORAS_TURNO} h de turno)</dd>`:'<dt>Sesión</dt><dd>Permanece abierta</dd>'}${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
+  ${esPrincipal()?`<div class="card"><h2>🗄️ Respaldo</h2><p>Firebase guarda una <b>copia completa de la base de datos cada domingo</b> y conserva las últimas 8 semanas. Si algo se borra por error, se puede recuperar.</p><div class="acciones"><button class="sec" id="descargarRespaldo">Descargar respaldo ahora</button></div><p class="muted">El archivo descargado incluye trabajos, fallas, calendario, máquinas, inventario y usuarios (sin contraseñas ni fotos).</p></div>`:''}
   ${esPrincipal()?`<div class="card"><h2>Mi nombre</h2><form id="fNombre"><label for="n_nom">Nombre completo</label><input id="n_nom" required maxlength="80" value="${esc(perfil.nombre)}"><div class="acciones"><button type="submit">Guardar nombre</button></div><div id="nErr"></div></form></div>`:''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
@@ -867,8 +965,9 @@ function enlazar(){
         await db.collection('registros').doc(editId).update(d);toast('Cambios guardados.');ir('trabajos');return}
       Object.assign(d,{fecha:adm?$('m_fecha').value:hoy(),hora:horaAhora(),tecnico:adm?$('m_tec').value.trim():perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,creadoEn:TS()});
       if(CERRADOS.includes(est))d.fechaCierre=d.fecha;
-      const progId=prefill&&prefill.progId;
-      await db.collection('registros').doc().set(d);
+      const progId=prefill&&prefill.progId;const usadas=leerRefs(f),fl=faltante(usadas);if(fl){$('fErr').innerHTML=`<p class="error">${esc(fl)}</p>`;b.disabled=false;return}if(usadas.length){d.refaccionesUsadas=usadas;d.refacciones=textoRefs(usadas,d.refacciones)}
+      const nref=db.collection('registros').doc();await nref.set(d);
+      try{await descontarRefs(usadas,nref.id,d.equipo)}catch(er){toast('Registro guardado, pero no se pudo descontar el inventario: '+errTxt(er))}
       if(progId&&adm)await db.collection('programa').doc(progId).update({estado:'Realizado'});
       maqSel=d.equipo;toast('Registro guardado en el historial de la '+maq(d.equipo).zona+'.');ir('ficha');
     }catch(e){$('fErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}};
@@ -881,9 +980,11 @@ function enlazar(){
     catch(e){$('fErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false;b.textContent='Enviar reporte'}};
   const fz=$('fFinalizar');
   if(fz)fz.onsubmit=async ev=>{ev.preventDefault();const b=fz.querySelector('button[type=submit]');b.disabled=true;b.textContent='Guardando…';$('zErr').innerHTML='';const id=fz.dataset.id,r=REG.find(x=>x.id===id);
+    const usadas=leerRefs(fz),fl=faltante(usadas);if(fl){$('zErr').innerHTML=`<p class="error">${esc(fl)}</p>`;b.disabled=false;b.textContent='Guardar y finalizar';return}
     try{const fotos=await subirFotos($('z_fotos'),id);const ini=ms(r&&r.inicioAtencion);
-      await db.collection('registros').doc(id).update({estado:'Cerrada',finAtencion:TS(),fechaCierre:hoy(),trabajoRealizado:$('z_trab').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:$('z_ref').value.trim(),fotosCierre:fotos,minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
-      finalizando=null;toast('Trabajo finalizado y guardado en el historial.');render(true)}
+      await db.collection('registros').doc(id).update({estado:POR_CONFIRMAR,finAtencion:TS(),trabajoRealizado:$('z_trab').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:textoRefs(usadas,$('z_ref').value.trim()),refaccionesUsadas:usadas,fotosCierre:fotos,minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
+      try{await descontarRefs(usadas,id,r&&r.equipo)}catch(er){toast('Trabajo guardado, pero no se pudo descontar el inventario: '+errTxt(er))}
+      finalizando=null;toast('✅ Trabajo finalizado. La operadora confirmará que la máquina quedó bien.');render(true)}
     catch(e){$('zErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false;b.textContent='Guardar y finalizar'}};
   const cf=$('cancelFin');if(cf)cf.onclick=()=>{finalizando=null;render(true)};
   const fp=$('formProg');
@@ -896,6 +997,21 @@ function enlazar(){
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
   const fn_=$('fNombre');if(fn_)fn_.onsubmit=async ev=>{ev.preventDefault();$('nErr').innerHTML='';try{await db.collection('usuarios').doc(usuario.uid).update({nombre:$('n_nom').value.trim()});toast('Nombre actualizado.');render(true)}catch(e){$('nErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
+  const ib=$('inv_buscar');if(ib)ib.oninput=()=>{invFiltro=ib.value;clearTimeout(ib._t);ib._t=setTimeout(()=>{render(true);const n=$('inv_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
+  const ai=$('archivoInv');if(ai)ai.onchange=async()=>{const fl=ai.files[0];if(!fl)return;try{await leerArchivoInv(fl)}catch(e){toast(e.message||errTxt(e))}};
+  const fr2=$('fRef');if(fr2)fr2.onsubmit=async ev=>{ev.preventDefault();const b=fr2.querySelector('button[type=submit]');b.disabled=true;$('rErr2').innerHTML='';const id=fr2.dataset.id;
+    const d={codigo:$('r_cod').value.trim(),nombre:$('r_nom').value.trim(),unidad:$('r_uni').value.trim()||'pza',ubicacion:$('r_ubi').value.trim(),minimo:Number($('r_min').value)||0,actualizado:TS()};
+    try{if(!id){d.existencia=Number($('r_exi').value)||0;const ref=db.collection('refacciones').doc();await ref.set(d);await db.collection('movimientos').doc().set({refaccion:ref.id,codigo:d.codigo,nombre:d.nombre,tipo:'Alta',cantidad:d.existencia,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()})}
+      else{const ent=Number($('r_ent').value)||0,aju=$('r_aju').value;const x=REF.find(y=>y.id===id);
+        if(aju!=='')d.existencia=Number(aju);else if(ent>0)d.existencia=fb.firestore.FieldValue.increment(ent);
+        await db.collection('refacciones').doc(id).update(d);
+        if(aju!=='')await db.collection('movimientos').doc().set({refaccion:id,codigo:d.codigo,nombre:d.nombre,tipo:'Ajuste',cantidad:Number(aju)-(Number(x&&x.existencia)||0),uid:usuario.uid,usuario:perfil.nombre,fecha:TS()});
+        else if(ent>0)await db.collection('movimientos').doc().set({refaccion:id,codigo:d.codigo,nombre:d.nombre,tipo:'Entrada',cantidad:ent,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()})}
+      invEdit=null;invAlta=false;toast('Inventario actualizado.');render(true)}catch(e){$('rErr2').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}};
+  const cr=$('cancelRef');if(cr)cr.onclick=()=>{invEdit=null;invAlta=false;render(true)};
+  const ci=$('confirmaImport');if(ci)ci.onclick=()=>confirmarImport(ci);
+  const xi=$('cancelaImport');if(xi)xi.onclick=()=>{importPrev=null;render(true)};
+  const rb=$('descargarRespaldo');if(rb)rb.onclick=descargarRespaldo;
   const fpw=$('fPass');if(fpw)fpw.onsubmit=async ev=>{ev.preventDefault();$('cErr').innerHTML='';if($('c_pass').value!==$('c_pass2').value){$('cErr').innerHTML='<p class="error">Las contraseñas no coinciden.</p>';return}
     try{await usuario.updatePassword($('c_pass').value);toast('Contraseña cambiada.');render(true)}catch(e){$('cErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
   const ht=$('histTipo');if(ht)ht.onchange=()=>{histTipo=ht.value;render(true)};
@@ -931,7 +1047,7 @@ async function atender(id,btn){btn.disabled=true;btn.textContent='Asignando…';
 
 // Clics
 document.addEventListener('click',async e=>{
-  if(!sonidoOn&&perfil&&conAlertas()){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
+  if(!sonidoOn&&perfil&&(conAlertas()||puedeConfirmar())){desbloquearAudio();if(sonidoOn)setTimeout(pintarBanner,0)}
   const b=e.target.closest('button');if(!b)return;
   if(b.id==='salir'){cerrarAlarma();await quitarPushDeEsteTelefono();try{await auth.signOut()}catch(er){}return}
   if(b.id==='activarPush'){activarPush(false);return}
@@ -962,6 +1078,9 @@ document.addEventListener('click',async e=>{
   if(b.dataset.dia){diaSel=b.dataset.dia;render(true);return}
   if(b.id==='altaUsr'){usrAlta=true;usrEdit=null;render(true);return}
   if(!esAdmin())return;
+  if(b.id==='altaRef'){invAlta=true;invEdit=null;render(true);return}
+  if(b.dataset.editref){invEdit=b.dataset.editref;invAlta=false;render(true);window.scrollTo({top:0});return}
+  if(b.dataset.borraref){if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='¿Eliminar?';setTimeout(()=>{if(b.isConnected){b.dataset.ok='';b.textContent='Eliminar'}},4000);return}try{await db.collection('refacciones').doc(b.dataset.borraref).delete();toast('Refacción eliminada.')}catch(er){toast(errTxt(er))}return}
   if(b.dataset.cerrar){const r=REG.find(x=>x.id===b.dataset.cerrar);if(!r)return;
     try{await db.collection('registros').doc(r.id).update(esFalla(r)?{estado:'Cerrada',fechaCierre:hoy(),cerradoPor:perfil.nombre,finAtencion:TS()}:{estado:'Completado',fechaCierre:hoy(),cerradoPor:perfil.nombre});toast(esFalla(r)?'Falla cerrada.':'Marcado como completado.')}catch(er){toast(errTxt(er))}return}
   if(b.dataset.editar){editId=b.dataset.editar;prefill=null;vista='registrar';escribirDireccion();render(true);window.scrollTo({top:0});return}
@@ -986,9 +1105,13 @@ async function migrar(ev){const b=ev.target;b.disabled=true;
     await batch.commit();LS.set('dpc_migrado',true);toast((regs.length+prog.length)+' registro(s) subidos a la Línea A.');render(true)
   }catch(e){toast(errTxt(e));b.disabled=false}}
 
+// ===== Respaldo descargable =====
+function descargarRespaldo(){const limpio=o=>JSON.parse(JSON.stringify(o,(k,v)=>v&&typeof v==='object'&&typeof v.toMillis==='function'?new Date(v.toMillis()).toISOString():v));
+  const data={generado:new Date().toISOString(),por:perfil.nombre,registros:limpio(REG),programa:limpio(PROG),maquinas:limpio(MAQCFG),refacciones:limpio(REF),movimientos:limpio(MOV),usuarios:limpio(USUARIOS.map(u=>({nombre:u.nombre,usuario:u.usuario,numEmpleado:u.numEmpleado,rol:u.rol,planta:u.planta,linea:u.linea,activo:u.activo})))};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='respaldo_mantenimiento_'+hoy()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
 // ===== Exportar =====
-function exportar(){const keys=['fecha','hora','equipo','linea','tipo','tipoFalla','severidad','actividad','tecnico','rol','atendidoPor','inicio','fin','respuesta_min','reparacion_min','trabajoRealizado','ajustes','refacciones','minutos','estado','fechaCierre','observaciones'];
-  const val=(r,k)=>{const t=tiempos(r);if(k==='linea')return (maq(r.equipo)||{}).zona;if(k==='inicio')return hhmm(ms(r.inicioAtencion));if(k==='fin')return hhmm(ms(r.finAtencion));if(k==='respuesta_min')return t.resp!=null?Math.round(t.resp/60000):'';if(k==='reparacion_min')return t.rep!=null?Math.round(t.rep/60000):'';return r[k]||''};
+function exportar(){const keys=['fecha','hora','equipo','linea','tipo','tipoFalla','severidad','actividad','tecnico','rol','atendidoPor','inicio','fin','respuesta_min','reparacion_min','trabajoRealizado','ajustes','refacciones','minutos','estado','fechaCierre','confirmadoPor','paroReal_min','reaperturas','observaciones'];
+  const val=(r,k)=>{const t=tiempos(r);if(k==='linea')return (maq(r.equipo)||{}).zona;if(k==='inicio')return hhmm(ms(r.inicioAtencion));if(k==='fin')return hhmm(ms(r.finAtencion));if(k==='paroReal_min'){const p=paroReal(r);return p!=null?Math.round(p/60000):''}if(k==='respuesta_min')return t.resp!=null?Math.round(t.resp/60000):'';if(k==='reparacion_min')return t.rep!=null?Math.round(t.rep/60000):'';return r[k]||''};
   const csv='﻿'+[keys,...filtrar().map(r=>keys.map(k=>val(r,k)))].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='mantenimiento_la_josefina_dpc_'+hoy()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
 async function copiar(t){try{await navigator.clipboard.writeText(t);toast('Enlace copiado.')}catch(e){const u=$('qrurl');if(u){const r=document.createRange();r.selectNodeContents(u);const s=getSelection();s.removeAllRanges();s.addRange(r)}toast('Selecciona y copia el enlace.')}}

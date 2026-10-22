@@ -62,9 +62,19 @@ service cloud.firestore {
         || (mecanico() && resource.data.tipo == 'Reporte de falla'
             && resource.data.estado == 'En atención'
             && resource.data.atendidoUid == request.auth.uid
-            && request.resource.data.estado == 'Cerrada'
+            && request.resource.data.estado in ['Por confirmar', 'Cerrada']
             && request.resource.data.finAtencion == request.time
-            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'fotosCierre', 'minutos']));
+            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos']))
+        // La operadora (o ingeniero de procesos) confirma: ✅ quedó bien / ❌ sigue fallando
+        || (activo() && rol() in ['Operador', 'Ingeniero de procesos'] && resource.data.tipo == 'Reporte de falla'
+            && resource.data.estado == 'Por confirmar'
+            && ((request.resource.data.estado == 'Cerrada'
+                 && request.resource.data.confirmadoUid == request.auth.uid
+                 && request.resource.data.confirmadoEn == request.time
+                 && cambia(['estado', 'fechaCierre', 'confirmadoPor', 'confirmadoUid', 'confirmadoEn', 'lineaReanudaEn']))
+              || (request.resource.data.estado == 'Pendiente'
+                 && request.resource.data.reabiertoEn == request.time
+                 && cambia(['estado', 'reaperturas', 'intentos', 'atendidoUid', 'atendidoPor', 'inicioAtencion', 'finAtencion', 'trabajoRealizado', 'ajustes', 'reabiertoPor', 'reabiertoEn', 'avisos', 'escalado']))));
       allow delete: if gestor();
     }
 
@@ -82,6 +92,22 @@ service cloud.firestore {
     match /tokens/{t} {
       allow read, delete: if sesion() && resource.data.uid == request.auth.uid;
       allow create, update: if activo() && request.resource.data.uid == request.auth.uid && request.resource.data.token == t;
+    }
+
+    // Inventario de refacciones: Supervisor y Administrador principal lo administran; el mecánico solo descuenta lo que usa
+    match /refacciones/{id} {
+      allow read: if activo();
+      allow create, delete: if gestor();
+      allow update: if gestor()
+        || (mecanico() && cambia(['existencia', 'actualizado'])
+            && request.resource.data.existencia is number
+            && request.resource.data.existencia < resource.data.existencia
+            && request.resource.data.existencia >= 0);
+    }
+    match /movimientos/{id} {
+      allow read: if activo();
+      allow create: if (gestor() || mecanico()) && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /programa/{id} {

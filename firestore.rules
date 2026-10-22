@@ -27,6 +27,8 @@ service cloud.firestore {
         && resource.data.rol == 'Dirección'
         && request.resource.data.rol == 'Administrador principal'
         && cambia(['rol']);
+      // El Administrador principal puede cambiar su propio nombre
+      allow update: if principal() && request.auth.uid == uid && cambia(['nombre']);
       allow create: if principal() && rolAsignable(request.resource.data.rol);
       allow create: if altas() && rolAsignable(request.resource.data.rol)
         && request.resource.data.rol != 'Administrador';

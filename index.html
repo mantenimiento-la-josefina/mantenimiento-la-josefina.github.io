@@ -31,24 +31,28 @@
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom,0px)}
-header{background:#ffffff;color:#173f80;padding-top:env(safe-area-inset-top,0px);border-bottom:5px solid #173f80;box-shadow:0 2px 10px #0000001a}
+header{background:#ffffff;color:#173f80;padding-top:env(safe-area-inset-top,0px);box-shadow:0 2px 10px #0000001a}
+header .hin{border-bottom:0;padding-block:14px}
+header .rojo{height:5px;background:#d7262e}
+.banda{background:#173f80;color:#fff}
+.banda:has(#sesion[hidden]){display:none}
+.banda .sesion{max-width:1050px;margin:auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .hin{max-width:1050px;margin:auto;padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 header h1{margin:0;font-size:24px;text-wrap:balance}
 header small{color:#5a6472}
 .marca{display:flex;align-items:center;gap:14px;min-width:0}
-.marca{flex-direction:column;align-items:flex-start;gap:4px}
-.logo-bloque{display:flex;flex-direction:column;align-items:center;width:max-content}
-.marca .logo-letras{height:54px;width:auto;display:block}
-.marca h1{font-size:15px;font-weight:800;letter-spacing:.32em;text-transform:uppercase;line-height:1;color:#173f80;margin:3px 0 0 .32em;text-align:center}
-.marca .plantas{font-size:12px}
+.marca .logo-letras{height:48px;width:auto;display:block;flex-shrink:0}
+.marca .divisor{width:2px;align-self:stretch;background:#173f80;flex-shrink:0}
+.marca h1{font-size:15px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;line-height:1.1;color:#173f80;margin:0}
+.marca .plantas{display:block;font-size:12px;margin-top:4px}
 .login-logo{display:block;width:100%;max-width:260px;height:auto;margin:4px auto 2px}
 .login-sub{text-align:center;margin:2px 0 18px;font-weight:800;letter-spacing:.32em;color:#173f80;font-size:15px}
 @media (prefers-color-scheme:dark){.login-sub{color:#8fb2ee}}
-@media(max-width:480px){.marca .logo-letras{height:44px}.marca h1{font-size:12.5px}}
+@media(max-width:480px){.marca .logo-letras{height:40px}.marca{gap:10px}.marca h1{font-size:12.5px;letter-spacing:.16em}.marca .plantas{font-size:11px}}
 .sesion{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
 .sesion b{display:block;font-size:14px}
-.sesion{color:#1c2833}
-.sesion button{background:#ffffff;color:#173f80;border:1px solid #c7d6f0;padding:7px 11px;font-size:13px}
+.sesion{color:#fff}
+.sesion button{background:#ffffff22;color:#fff;border:1px solid #ffffff66;padding:7px 11px;font-size:13px}
 .wrap{max-width:1050px;margin:auto;padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}
 nav.grande{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -194,7 +198,7 @@ body.modo-pantalla .wrap{max-width:none}
 </style>
 </head>
 <body>
-<header><div class="hin"><div class="marca"><div class="logo-bloque"><img class="logo-letras" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><h1>Mantenimiento</h1></div><small class="plantas">Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div><div class="sesion" id="sesion" hidden></div></div></header>
+<header><div class="hin"><div class="marca"><img class="logo-letras" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><span class="divisor"></span><div><h1>Mantenimiento</h1><small class="plantas">Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div></div><div class="rojo"></div><div class="banda"><div class="sesion" id="sesion" hidden></div></div></header>
 <div class="wrap">
   <div id="banner"></div>
   <nav id="nav" hidden></nav>
@@ -440,7 +444,7 @@ function ocultarSesion(){$('sesion').hidden=true;$('nav').hidden=true;document.b
 function pantallaLogin(){
   ocultarSesion();
   const m=destino&&destino.maq?maq(destino.maq):null;
-  $('app').innerHTML=`<div class="login"><div class="card"><img class="login-logo" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><p class="login-sub">MANTENIMIENTO</p><h2>Iniciar sesión</h2>
+  $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
   ${LS.get('dpc_aviso_turno',0)?(LS.set('dpc_aviso_turno',0),`<p class="aviso">Tu sesión se cerró al cumplir ${HORAS_TURNO} horas de turno. Vuelve a entrar cuando inicies tu siguiente turno.</p>`):''}
   ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
@@ -830,6 +834,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${finTurno()?`<dt>Sesión</dt><dd>Se cierra a las ${hhmm(finTurno())} (${HORAS_TURNO} h de turno)</dd>`:'<dt>Sesión</dt><dd>Permanece abierta</dd>'}${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
+  ${esPrincipal()?`<div class="card"><h2>Mi nombre</h2><form id="fNombre"><label for="n_nom">Nombre completo</label><input id="n_nom" required maxlength="80" value="${esc(perfil.nombre)}"><div class="acciones"><button type="submit">Guardar nombre</button></div><div id="nErr"></div></form></div>`:''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
   <div class="acciones"><button type="submit">Cambiar contraseña</button></div><div id="cErr"></div></form></div>`;
@@ -890,6 +895,7 @@ function enlazar(){
   const fr=$('fReset');if(fr)fr.onsubmit=async ev=>{ev.preventDefault();const b=fr.querySelector('button');b.disabled=true;$('rErr').innerHTML='';try{await llamar('restablecerContrasena',{uid:fr.dataset.uid,contrasena:$('r_pass').value});toast('Contraseña restablecida.');$('r_pass').value=''}catch(e){$('rErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}b.disabled=false};
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
+  const fn_=$('fNombre');if(fn_)fn_.onsubmit=async ev=>{ev.preventDefault();$('nErr').innerHTML='';try{await db.collection('usuarios').doc(usuario.uid).update({nombre:$('n_nom').value.trim()});toast('Nombre actualizado.');render(true)}catch(e){$('nErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
   const fpw=$('fPass');if(fpw)fpw.onsubmit=async ev=>{ev.preventDefault();$('cErr').innerHTML='';if($('c_pass').value!==$('c_pass2').value){$('cErr').innerHTML='<p class="error">Las contraseñas no coinciden.</p>';return}
     try{await usuario.updatePassword($('c_pass').value);toast('Contraseña cambiada.');render(true)}catch(e){$('cErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
   const ht=$('histTipo');if(ht)ht.onchange=()=>{histTipo=ht.value;render(true)};

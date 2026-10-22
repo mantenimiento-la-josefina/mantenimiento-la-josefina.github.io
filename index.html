@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#173f80">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" type="image/png" href="icono-192.png">
 <title>Mantenimiento La Josefina DPC</title>
 <style>
 /* Layout: banda guinda de encabezado + columna central de tarjetas */
@@ -34,6 +35,11 @@ header{background:var(--header);color:#fff;padding-top:env(safe-area-inset-top,0
 .hin{max-width:1050px;margin:auto;padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 header h1{margin:0;font-size:24px;text-wrap:balance}
 header small{opacity:.85}
+.marca{display:flex;align-items:center;gap:14px;min-width:0}
+.marca .logo{background:#fff;border-radius:12px;padding:6px 10px;display:flex;flex-shrink:0;box-shadow:0 2px 8px #0003}
+.marca .logo img{height:44px;width:auto;display:block}
+.login-logo{display:block;width:100%;max-width:280px;height:auto;margin:0 auto 14px}
+@media(max-width:480px){.marca .logo img{height:34px}.marca{gap:10px}}
 .sesion{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
 .sesion b{display:block;font-size:14px}
 .sesion button{background:#ffffff22;color:#fff;border:1px solid #ffffff55;padding:7px 11px;font-size:13px}
@@ -182,7 +188,7 @@ body.modo-pantalla .wrap{max-width:none}
 </style>
 </head>
 <body>
-<header><div class="hin"><div><h1>🔧 Mantenimiento La Josefina DPC</h1><small>La Josefina DPC · Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div><div class="sesion" id="sesion" hidden></div></div></header>
+<header><div class="hin"><div class="marca"><span class="logo"><img src="logo.png" alt="La Josefina" width="900" height="294"></span><div><h1>Mantenimiento La Josefina DPC</h1><small>Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div><div class="sesion" id="sesion" hidden></div></div></header>
 <div class="wrap">
   <div id="banner"></div>
   <nav id="nav" hidden></nav>
@@ -428,7 +434,7 @@ function ocultarSesion(){$('sesion').hidden=true;$('nav').hidden=true;document.b
 function pantallaLogin(){
   ocultarSesion();
   const m=destino&&destino.maq?maq(destino.maq):null;
-  $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
+  $('app').innerHTML=`<div class="login"><div class="card"><img class="login-logo" src="logo.png" alt="La Josefina · Operaciones corporativas" width="900" height="294"><h2>Iniciar sesión</h2>
   ${LS.get('dpc_aviso_turno',0)?(LS.set('dpc_aviso_turno',0),`<p class="aviso">Tu sesión se cerró al cumplir ${HORAS_TURNO} horas de turno. Vuelve a entrar cuando inicies tu siguiente turno.</p>`):''}
   ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>

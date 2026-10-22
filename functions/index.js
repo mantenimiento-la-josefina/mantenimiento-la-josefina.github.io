@@ -85,11 +85,21 @@ exports.avisarFalla = onDocumentCreated('registros/{id}', async (event) => {
 
 async function destinosPara(equipo, n, roles) {
   const tokSnap = await db.collection('tokens').get();
-  const porUid = {};
-  tokSnap.forEach(d => { const t = d.data(); if (t.uid) (porUid[t.uid] = porUid[t.uid] || []).push(d.id); });
+  const porUid = {}, ahora = Date.now(), vencidos = [];
+  tokSnap.forEach(d => {
+    const t = d.data();
+    // Turno terminado (8 h desde que inició sesión): ya no se le avisa y se borra el registro del teléfono
+    if (t.expira && Number(t.expira) < ahora) { vencidos.push(d.ref); return; }
+    if (t.uid) (porUid[t.uid] = porUid[t.uid] || []).push(d.id);
+  });
+  await Promise.all(vencidos.map(ref => ref.delete().catch(() => {})));
+  // Mecánicos que ya atienden una falla no reciben avisos de otras máquinas hasta finalizar
+  const enAtencion = await db.collection('registros').where('estado', '==', 'En atención').get();
+  const ocupados = new Set(enAtencion.docs.map(d => d.data().atendidoUid).filter(Boolean));
   const destinos = [];
   for (const uid of Object.keys(porUid)) {
     const p = await perfilDe(uid);
+    if (p && p.rol === 'Mecánico' && ocupados.has(uid)) continue;
     if (leDebeLlegar(p, equipo, n || 1, roles)) destinos.push(...porUid[uid]);
   }
   return destinos;

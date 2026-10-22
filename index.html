@@ -262,7 +262,7 @@ let REG=[], PROG=[], MAQCFG={}, USUARIOS=[];
 let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
-let escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
+let estabaOcupado=false, escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
 let audioCtx=null, sonidoOn=false, silencioHasta=0, ultimoSonido=0, wakeLock=null;
 
 // ===== Utilidades =====
@@ -293,6 +293,15 @@ const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
 function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
+const HORAS_TURNO=8, ROLES_TURNO=['Mecánico','Supervisor de mantenimiento','Operador','Ingeniero de procesos'];
+function tieneTurno(){return activoP()&&ROLES_TURNO.includes(perfil.rol)}
+function sesionInicio(){const x=LS.get('dpc_sesion',null);return x&&usuario&&x.uid===usuario.uid?x.inicio:null}
+function finTurno(){const i=sesionInicio();return tieneTurno()&&i?i+HORAS_TURNO*3600000:null}
+let cerrandoTurno=false;
+async function cerrarPorTurno(){if(cerrandoTurno)return;cerrandoTurno=true;try{cerrarAlarma()}catch(e){}await quitarPushDeEsteTelefono();LS.set('dpc_aviso_turno',1);LS.set('dpc_sesion',null);try{await auth.signOut()}catch(e){}cerrandoTurno=false}
+function turnoVencido(){const f=finTurno();return !!(f&&Date.now()>f)}
+// Mecánico ocupado: atiende una falla y no recibe avisos de otras máquinas hasta finalizar
+function ocupado(){return esMecanico()&&!!usuario&&REG.some(r=>fallaEnAtencion(r)&&r.atendidoUid===usuario.uid)}
 function atiende(){return esPrincipal()||esMecanico()}
 function avisa(){return activoP()&&perfil.rol==='Supervisor de mantenimiento'}
 function recibeEsc(){return activoP()&&['Supervisor de mantenimiento','Coordinación',PRINCIPAL].includes(perfil.rol)}
@@ -337,7 +346,7 @@ async function activarPush(silencioso){
     const reg=await navigator.serviceWorker.register('firebase-messaging-sw.js');await navigator.serviceWorker.ready;
     const token=await fb.messaging().getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
     if(!token)throw new Error('sin token');
-    await db.collection('tokens').doc(token).set({uid:usuario.uid,token,rol:perfil.rol,nombre:perfil.nombre,dispositivo:navigator.userAgent.slice(0,160),actualizado:TS()});
+    await db.collection('tokens').doc(token).set({uid:usuario.uid,token,rol:perfil.rol,nombre:perfil.nombre,dispositivo:navigator.userAgent.slice(0,160),expira:finTurno()||null,actualizado:TS()});
     LS.set('push_uid',usuario.uid);LS.set('push_token',token);
     if(!silencioso)toast('✅ Notificaciones activadas en este teléfono.');pintarBanner();if(vista==='cuenta')render(true);return true
   }catch(e){console.warn(e);if(!silencioso)toast('No se pudieron activar las notificaciones ('+((e&&(e.code||e.message))||'error')+').');return false}}
@@ -386,15 +395,17 @@ function suscribir(){
     if(!usuario||!perfil)return;
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
     if(!primeraCarga&&avisa()){const nv=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nv.length){sirenaSuave(true);const m=maq(nv[0].equipo);toast('🚨 Nueva falla en '+(m?m.zona:nv[0].equipo)+': '+(nv[0].tipoFalla||''));parpadearTitulo()}}
-    if(!primeraCarga&&insiste()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
-    const eraPrimera=primeraCarga;primeraCarga=false;pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
+    if(!primeraCarga&&insiste()&&!ocupado()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
+    const eraPrimera=primeraCarga;primeraCarga=false;const oc=ocupado(),libero=estabaOcupado&&!oc;estabaOcupado=oc;if(libero&&insiste()&&misPendientes().length)setTimeout(abrirAlarma,0);pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
 }
 function entrar(){
+  if(!sesionInicio())LS.set('dpc_sesion',{uid:usuario.uid,inicio:Date.now()});
+  if(turnoVencido()){cerrarPorTurno();return}
   pintarSesion();
-  if(conAlertas()&&estadoPush()==='pendiente'&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
+  if(conAlertas()&&VAPID_KEY&&SERVIDOR_LISTO&&pushSoportado()&&Notification.permission==='granted')activarPush(true);
   let v=inicioRol();
   if(destino&&destino.vista==='qr'&&insiste()){const d=destino;destino=null;maqSel=d.maq;escaneoPendiente=d.maq;ir('alertas');return}
   if(destino&&destino.vista==='qr'){const d=destino;destino=null;maqSel=d.maq;
@@ -418,6 +429,7 @@ function pantallaLogin(){
   ocultarSesion();
   const m=destino&&destino.maq?maq(destino.maq):null;
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
+  ${LS.get('dpc_aviso_turno',0)?(LS.set('dpc_aviso_turno',0),`<p class="aviso">Tu sesión se cerró al cumplir ${HORAS_TURNO} horas de turno. Vuelve a entrar cuando inicies tu siguiente turno.</p>`):''}
   ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="l_pass">Contraseña</label><input id="l_pass" name="p" type="password" autocomplete="current-password" required>
@@ -430,7 +442,7 @@ function pantallaLogin(){
   <div class="acciones"><button type="submit">Crear cuenta de Administrador principal</button></div><div id="iErr"></div></form></div></div>`;
   $('abrirInicial').onclick=e=>{e.preventDefault();$('cardInicial').hidden=false;$('i_nom').focus()};
   $('fLogin').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;$('lErr').innerHTML='';desbloquearAudio();
-    try{await auth.signInWithEmailAndPassword(correoDe($('l_user').value),$('l_pass').value)}catch(er){$('lErr').innerHTML=`<p class="error">${esc(errTxt(er))}</p>`;b.disabled=false}};
+    try{const cr=await auth.signInWithEmailAndPassword(correoDe($('l_user').value),$('l_pass').value);LS.set('dpc_sesion',{uid:cr.user.uid,inicio:Date.now()})}catch(er){$('lErr').innerHTML=`<p class="error">${esc(errTxt(er))}</p>`;b.disabled=false}};
   $('fInicial').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;$('iErr').innerHTML='';
     try{const c=await auth.createUserWithEmailAndPassword(correoDe(USUARIO_INICIAL),$('i_pass').value);
       await db.collection('usuarios').doc(c.user.uid).set({nombre:$('i_nom').value.trim(),usuario:USUARIO_INICIAL,rol:PRINCIPAL,planta:PLANTAS[0],linea:'todas',activo:true,creadoEn:fb.firestore.FieldValue.serverTimestamp()});
@@ -478,7 +490,7 @@ function sirena(){if(!sonidoOn||!audioCtx||Date.now()<silencioHasta)return;ultim
   try{if(audioCtx.state==='suspended')audioCtx.resume();const t0=audioCtx.currentTime;
     for(let i=0;i<6;i++){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=i%2?660:990;g.gain.setValueAtTime(0.0001,t0+i*0.32);g.gain.exponentialRampToValueAtTime(0.25,t0+i*0.32+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+i*0.32+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t0+i*0.32);o.stop(t0+i*0.32+0.3);SONANDO.push(o)}while(SONANDO.length>40)SONANDO.shift();}catch(e){}
   try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}}
-function misPendientes(){return REG.filter(fallaPendiente).filter(deMiLinea).filter(r=>!TOMANDO.has(r.id)).sort((a,c)=>msCreado(a)-msCreado(c))}
+function misPendientes(){if(ocupado())return [];return REG.filter(fallaPendiente).filter(deMiLinea).filter(r=>!TOMANDO.has(r.id)).sort((a,c)=>msCreado(a)-msCreado(c))}
 function abrirAlarma(){if(!perfil||!insiste())return;const pend=misPendientes();if(!pend.length)return cerrarAlarma();
   const r=pend[0],m=maq(r.equipo),a=$('alarma');
   a.innerHTML=`<div class="caja"><h2>🚨 FALLA</h2><div class="zona">${esc(m?(m.planta?m.planta+' · ':'')+m.zona:r.equipo)}</div><p><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' · LÍNEA DETENIDA':''}</p><p>${esc(r.actividad||'')}</p><p>Reportó ${esc(r.tecnico||'')}${pend.length>1?' · '+pend.length+' fallas sin atender':''}</p>${sonidoOn?'':'<p><b>Toca la pantalla para activar el sonido</b></p>'}<div class="instruccion">Para atenderla y apagar la alarma, escanea el código QR de la máquina.</div><button class="atender" id="abrirEscaner">📷 Escanear QR de la máquina</button></div>`;
@@ -527,8 +539,9 @@ function sirenaSuave(ya){if(!sonidoOn||!audioCtx)return;ultimoSuave=Date.now();
   try{navigator.vibrate&&navigator.vibrate([250,120,250])}catch(e){}}
 function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTML='';return}
   if(!perfil||!conAlertas()||vista==='pantalla'||vista==='tablero'&&tableroCompleto){b.innerHTML='';return}
-  const pend=REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
+  const oc_=insiste()&&ocupado();const pend=oc_?[]:REG.filter(fallaPendiente).filter(deMiLinea).sort((a,c)=>msCreado(a)-msCreado(c));
   let h='';
+  if(oc_){const mi=REG.find(r=>fallaEnAtencion(r)&&r.atendidoUid===usuario.uid),mm=mi&&maq(mi.equipo);h+=`<div class="aviso" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>🔧 Estás atendiendo <b>${esc(mm?mm.planta+' · '+mm.zona:'')}</b>. Los avisos de otras máquinas están en pausa hasta que finalices el trabajo.</span>${vista!=='alertas'?'<button class="mini" data-v2="alertas">Ir a mi falla</button>':''}</div>`}
   const ep=estadoPush();
   if(ep==='pendiente'&&conAlertas())h+=`<div class="activar"><span>📲 Recibe las fallas aunque el teléfono esté bloqueado.</span><button class="mini" id="activarPush">Activar notificaciones</button></div>`;
   if(ep==='ios-instalar')h+=`<div class="activar"><span>📲 Para recibir fallas con el iPhone bloqueado: toca Compartir → «Agregar a inicio» y abre la app desde ese ícono.</span></div>`;
@@ -541,7 +554,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTM
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
 let escVistas=0;
-setInterval(()=>{actualizarRelojes();if(atiende()&&misPendientes().length&&Date.now()-ultimoSonido>45000)sirena();
+setInterval(()=>{actualizarRelojes();if(perfil&&usuario&&turnoVencido()){cerrarPorTurno();return}if(atiende()&&misPendientes().length&&Date.now()-ultimoSonido>45000)sirena();
   if((pendSinEnterar().length||escSinEnterar().length)&&Date.now()-ultimoSuave>30000)sirenaSuave();
   const ne=escSinEnterar().length;if(ne!==escVistas){escVistas=ne;pintarBanner()}},1000);
 async function pedirWakeLock(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
@@ -802,7 +815,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="item"><div><span class="tag">Operador</span> Reporta fallas y consulta ajustes y reparaciones anteriores.</div></div>
   <p class="muted">Para eliminar un perfil, primero desactívalo; después aparece el botón «Eliminar». Los trabajos y fallas que registró se conservan en el historial.</p>
   <p class="muted">Números sugeridos: Administración y Dirección 1000–1099 · Gerencia y Coordinación 1100–1999 · Mantenimiento 2000–2999 · Operadores 3000–3999 · Ingenieros de procesos 4000–4999.</p></div>`};
-V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
+V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${finTurno()?`<dt>Sesión</dt><dd>Se cierra a las ${hhmm(finTurno())} (${HORAS_TURNO} h de turno)</dd>`:'<dt>Sesión</dt><dd>Permanece abierta</dd>'}${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">

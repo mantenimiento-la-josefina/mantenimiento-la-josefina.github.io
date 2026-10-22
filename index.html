@@ -36,10 +36,13 @@ header{background:var(--header);color:#fff;padding-top:env(safe-area-inset-top,0
 header h1{margin:0;font-size:24px;text-wrap:balance}
 header small{opacity:.85}
 .marca{display:flex;align-items:center;gap:14px;min-width:0}
-.marca .logo{background:#fff;border-radius:12px;padding:6px 10px;display:flex;flex-shrink:0;box-shadow:0 2px 8px #0003}
-.marca .logo img{height:44px;width:auto;display:block}
-.login-logo{display:block;width:100%;max-width:280px;height:auto;margin:0 auto 14px}
-@media(max-width:480px){.marca .logo img{height:34px}.marca{gap:10px}}
+.marca .logo-letras{height:52px;width:auto;display:block;flex-shrink:0}
+.marca .titulo{border-left:2px solid #ffffff55;padding-left:14px;min-width:0}
+.marca h1{font-size:21px;letter-spacing:.06em;text-transform:uppercase;line-height:1.15}
+.marca h1 span{color:#ffb3b6}
+.login-logo{display:block;width:100%;max-width:260px;height:auto;margin:4px auto 2px}
+.login-sub{text-align:center;margin:0 0 18px;font-weight:800;letter-spacing:.14em;color:var(--accent);font-size:15px}
+@media(max-width:480px){.marca .logo-letras{height:40px}.marca{gap:10px}.marca .titulo{padding-left:10px}.marca h1{font-size:17px}}
 .sesion{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
 .sesion b{display:block;font-size:14px}
 .sesion button{background:#ffffff22;color:#fff;border:1px solid #ffffff55;padding:7px 11px;font-size:13px}
@@ -188,7 +191,7 @@ body.modo-pantalla .wrap{max-width:none}
 </style>
 </head>
 <body>
-<header><div class="hin"><div class="marca"><span class="logo"><img src="logo.png" alt="La Josefina" width="900" height="294"></span><div><h1>Mantenimiento La Josefina DPC</h1><small>Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div><div class="sesion" id="sesion" hidden></div></div></header>
+<header><div class="hin"><div class="marca"><img class="logo-letras" src="logo-blanco.png" alt="La Josefina" width="800" height="225"><div class="titulo"><h1>Mantenimiento <span>DPC</span></h1><small>Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div><div class="sesion" id="sesion" hidden></div></div></header>
 <div class="wrap">
   <div id="banner"></div>
   <nav id="nav" hidden></nav>
@@ -434,7 +437,7 @@ function ocultarSesion(){$('sesion').hidden=true;$('nav').hidden=true;document.b
 function pantallaLogin(){
   ocultarSesion();
   const m=destino&&destino.maq?maq(destino.maq):null;
-  $('app').innerHTML=`<div class="login"><div class="card"><img class="login-logo" src="logo.png" alt="La Josefina · Operaciones corporativas" width="900" height="294"><h2>Iniciar sesión</h2>
+  $('app').innerHTML=`<div class="login"><div class="card"><img class="login-logo" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><p class="login-sub">MANTENIMIENTO DPC</p><h2>Iniciar sesión</h2>
   ${LS.get('dpc_aviso_turno',0)?(LS.set('dpc_aviso_turno',0),`<p class="aviso">Tu sesión se cerró al cumplir ${HORAS_TURNO} horas de turno. Vuelve a entrar cuando inicies tu siguiente turno.</p>`):''}
   ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>

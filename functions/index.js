@@ -149,7 +149,7 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
 });
 
 // 1c) Falla reabierta por la operadora (❌ sigue fallando) → aviso inmediato a los mecánicos
-exports.avisoFallaReabierta = onDocumentUpdated('registros/{id}', async (event) => {
+exports.notificarReaperturaFalla = onDocumentUpdated('registros/{id}', async (event) => {
   const a = event.data.before.data() || {}, r = event.data.after.data() || {};
   if (r.tipo !== 'Reporte de falla' || a.estado !== 'Por confirmar' || !['Pendiente', 'Abierta'].includes(r.estado)) return;
   const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
@@ -158,7 +158,7 @@ exports.avisoFallaReabierta = onDocumentUpdated('registros/{id}', async (event) 
 });
 
 // 1d) Refacción llega a su mínimo → aviso a supervisores y Administrador principal
-exports.avisoRefaccionMinimo = onDocumentUpdated('refacciones/{id}', async (event) => {
+exports.notificarRefaccionMinimo = onDocumentUpdated('refacciones/{id}', async (event) => {
   const a = event.data.before.data() || {}, r = event.data.after.data() || {};
   const min = Number(r.minimo || 0), antes = Number(a.existencia), ahora = Number(r.existencia);
   if (!(antes > min && ahora <= min)) return;

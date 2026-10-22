@@ -24,19 +24,27 @@ jobs:
         if: steps.cred.outputs.ok == 'true'
         run: npm ci --no-audit --no-fund
         working-directory: functions
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.cred.outputs.ok == 'true'
+      - name: Limpiar funciones a medio crear
+        if: steps.cred.outputs.ok == 'true' && hashFiles('herramientas/borrar-funciones.txt') != ''
+        run: |
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" -q
+          for f in $(cat herramientas/borrar-funciones.txt); do
+            if gcloud functions delete "$f" --gen2 --region us-central1 --project mantenimiento-la-josefina -q >/dev/null 2>err.txt; then echo "::notice::Función $f borrada"; else echo "::notice::$f: $(tail -1 err.txt)"; fi
+          done
       - name: Publicar reglas de seguridad y servidor
         if: steps.cred.outputs.ok == 'true'
         run: |
           for i in 1 2; do
             if npx --yes firebase-tools@15.30.0 deploy --only firestore:rules,functions --project mantenimiento-la-josefina --non-interactive --force > salida.txt 2>&1; then cat salida.txt; exit 0; fi
             cat salida.txt
+            sed "s/\x1b\[[0-9;]*m//g" salida.txt | grep -iE "error|failed|denied|permission" | grep -v "ensuring required API" | head -6 | while IFS= read -r l; do echo "::warning::Intento $i: $l"; done
             echo "Intento $i falló, esperando 90 segundos"
             sleep 90
           done
           sed "s/\x1b\[[0-9;]*m//g" salida.txt | grep -v "ensuring required API" | grep -v "^\s*$" | tail -9 | while IFS= read -r l; do echo "::error::$l"; done
           exit 1
-      - uses: google-github-actions/setup-gcloud@v2
-        if: steps.cred.outputs.ok == 'true'
       - name: Permitir que la app llame al servidor
         if: steps.cred.outputs.ok == 'true'
         run: |

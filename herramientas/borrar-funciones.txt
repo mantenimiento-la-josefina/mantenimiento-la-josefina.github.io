@@ -1,0 +1,4 @@
+avisoFallaReabierta
+avisoRefaccionMinimo
+avisarReapertura
+avisarMinimo

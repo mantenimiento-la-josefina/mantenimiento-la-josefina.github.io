@@ -313,7 +313,10 @@ function esCoordinacion(){return activoP()&&perfil.rol==='Coordinación'}
 function grupo(){if(!perfil)return '';if(esPrincipal())return 'principal';if(['Dirección','Gerencia'].includes(perfil.rol))return 'direccion';if(perfil.rol==='Coordinación')return 'coordinacion';return perfil.rol}
 const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r){return ROL_TXT[r]||r}
 function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
-function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||m.planta===pl}
+// AM Pack y CIC comparten mecánicos: quien es de una atiende las dos
+const GRUPOS_PLANTA=[['AM Pack','CIC']];
+function plantasDe(pl){return GRUPOS_PLANTA.find(g=>g.includes(pl))||[pl]}
+function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||plantasDe(pl).includes(m.planta)}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
 const HORAS_TURNO=8, ROLES_TURNO=['Mecánico','Supervisor de mantenimiento','Operador','Ingeniero de procesos'];
 function tieneTurno(){return activoP()&&ROLES_TURNO.includes(perfil.rol)}
@@ -323,7 +326,7 @@ let cerrandoTurno=false;
 async function cerrarPorTurno(){if(cerrandoTurno)return;cerrandoTurno=true;try{cerrarAlarma()}catch(e){}await quitarPushDeEsteTelefono();LS.set('dpc_aviso_turno',1);LS.set('dpc_sesion',null);try{await auth.signOut()}catch(e){}cerrandoTurno=false}
 function turnoVencido(){const f=finTurno();return !!(f&&Date.now()>f)}
 // Mecánico ocupado: atiende una falla y no recibe avisos de otras máquinas hasta finalizar
-function ocupado(){return esMecanico()&&!!usuario&&REG.some(r=>fallaEnAtencion(r)&&r.atendidoUid===usuario.uid)}
+function ocupado(){return atiende()&&!!usuario&&REG.some(r=>fallaEnAtencion(r)&&r.atendidoUid===usuario.uid)}
 function atiende(){return esPrincipal()||esMecanico()}
 function avisa(){return activoP()&&perfil.rol==='Supervisor de mantenimiento'}
 function recibeEsc(){return activoP()&&['Supervisor de mantenimiento','Coordinación',PRINCIPAL].includes(perfil.rol)}
@@ -698,7 +701,7 @@ V.panel=()=>{
     <div class="acciones"><button class="sec" data-ficha="${m.id}">Ver ficha</button><button class="sec" data-verabiertos="${m.id}">Ver abiertos</button></div></div>`}).join('')}</div>
   <div class="card"><h2>Últimos registros</h2>${filas(regs.slice(0,8))}</div>`;
 };
-V.alertas=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
+V.alertas=()=>{const pend=REG.filter(fallaPendiente).filter(r=>!esMecanico()||deMiLinea(r)).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
   const mias=aten.filter(r=>r.atendidoUid===usuario.uid),otras=aten.filter(r=>r.atendidoUid!==usuario.uid);
   const hoyCerr=REG.filter(r=>esFalla(r)&&r.estado==='Cerrada'&&r.fechaCierre===hoy()).sort((a,b)=>(ms(b.finAtencion)||0)-(ms(a.finAtencion)||0));
   return `${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
@@ -717,7 +720,7 @@ V.tablero=()=>{const est=MAQUINAS.map(m=>estadoTile(m.id)),c=k=>est.filter(e=>e.
   <div class="semaforo"><span><i style="background:#1e8a4c"></i>Trabajando: ${c('verde')}</span><span><i style="background:#c8102e"></i>Paradas / con falla: ${c('rojo')}</span><span><i style="background:#f2b705"></i>En atención: ${c('amarillo')}</span></div>
   ${PLANTAS.map(pl=>{const ms_=maquinasDe(pl);return `<h2>Planta ${esc(pl)}</h2><div class="tablero-prod">${ms_.length?ms_.map(m=>{const e=estadoTile(m.id);return `<div class="maqtile ${e.cls}"><div><h3>${esc(m.zona)}</h3><small>${esc(m.nombre)} · ${esc(m.id)}</small></div><div><div class="est">${e.txt}</div><small>${e.det}</small>${e.desde?`<div class="reloj" data-desde="${e.desde}"></div>`:''}${e.n>1?`<small>${e.n} fallas abiertas</small>`:''}</div></div>`}).join(''):'<div class="maqtile vacia"><div>Todavía no hay líneas registradas en esta planta.</div></div>'}</div>`}).join('')}
   <p class="muted">Se actualiza solo, en tiempo real. Rojo: falla reportada sin atender · Amarillo: un mecánico ya la está atendiendo · Verde: trabajando.</p>`};
-V.pantalla=()=>{const pend=REG.filter(fallaPendiente).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
+V.pantalla=()=>{const pend=REG.filter(fallaPendiente).filter(r=>!esMecanico()||deMiLinea(r)).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
   return `<div class="tabhead"><h1>🔧 Mantenimiento La Josefina DPC</h1><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hora" id="horaTablero"></span>${sonidoOn?'':'<button id="activarAlertas">🔔 Activar sonido</button>'}<button class="sec" data-v2="${inicioRol()}">Salir de pantalla</button></div></div>
   <div class="grid" style="margin-bottom:18px">${MAQUINAS.map(m=>{const e=estadoMaq(m.id);return `<div class="card kpi"><h2>${esc(m.zona)}</h2><span class="tag ${e.cls}" style="font-size:15px">${esc(e.txt)}</span></div>`}).join('')}${kpi(pend.length,'Sin atender')}${kpi(aten.length,'En atención')}</div>
   <div class="tablero"><div><h2>🚨 Sin atender</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0;font-size:18px">Sin fallas pendientes ✅</p></div>'}</div>
@@ -892,7 +895,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
   <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option value="${r}" ${r===u.rol?'selected':''}>${rolTxt(r)}</option>`).join('')}</select></div>
-  <div><label for="u_planta">Planta</label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
+  <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Todas las líneas de la planta</option>${maquinasDe(u.planta||PLANTAS[0]).map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
   ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>

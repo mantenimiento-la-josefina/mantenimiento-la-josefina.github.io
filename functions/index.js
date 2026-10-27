@@ -39,13 +39,16 @@ async function exigir(req, roles) {
   return p;
 }
 // Mecánicos: cada aviso. Supervisores: el primero y uno de cada 3 repeticiones (menos insistente).
+// AM Pack y CIC comparten mecánicos
+const GRUPOS_PLANTA = [['AM Pack', 'CIC']];
+function plantasDe(pl) { return GRUPOS_PLANTA.find(g => g.includes(pl)) || [pl]; }
 function leDebeLlegar(perfil, equipo, n, roles) {
   roles = roles || ROLES_AVISO;
   if (!perfil || perfil.activo !== true || !roles.includes(perfil.rol)) return false;
   if (!roles.includes('Coordinación') && perfil.rol === 'Supervisor de mantenimiento' && n > 1 && (n - 1) % 3 !== 0) return false;
   const m = MAQUINAS[equipo];
   if (perfil.linea && perfil.linea !== 'todas') return perfil.linea === equipo;
-  if (perfil.planta && m) return perfil.planta === m.planta;
+  if (perfil.planta && m) return plantasDe(perfil.planta).includes(m.planta);
   return true;
 }
 
@@ -100,7 +103,8 @@ async function destinosPara(equipo, n, roles) {
   const destinos = [];
   for (const uid of Object.keys(porUid)) {
     const p = await perfilDe(uid);
-    if (p && p.rol === 'Mecánico' && ocupados.has(uid)) continue;
+    // Quien ya atiende una falla no recibe avisos de otras máquinas (salvo el escalamiento a supervisión)
+    if (p && ocupados.has(uid) && !(roles || []).includes('Coordinación')) continue;
     if (leDebeLlegar(p, equipo, n || 1, roles)) destinos.push(...porUid[uid]);
   }
   return destinos;

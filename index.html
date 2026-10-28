@@ -199,6 +199,20 @@ body.modo-pantalla .wrap{max-width:none}
 #escaner[hidden]{display:none}
 #escaner video{width:100%;max-width:480px;border-radius:14px;border:4px solid #fff}
 #escaner button{padding:16px 22px;font-size:18px;border-radius:12px;border:0;background:#fff;color:#173f80;font-weight:700}
+.sem{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.sem.verde{background:var(--ok-bg);color:var(--ok)}.sem.amarillo{background:var(--warn-bg);color:var(--warn)}.sem.rojo{background:var(--bad-bg);color:var(--bad)}.sem.nd{background:var(--th);color:var(--muted)}
+.semtab td:first-child{white-space:nowrap}.semtab tr.niv0 td{background:var(--accent-soft);font-weight:600}.semtab tr.niv1 td:first-child{padding-left:22px}.semtab tr.niv2 td:first-child{padding-left:40px;color:var(--muted)}
+tr.s-verde td:first-child{box-shadow:inset 5px 0 0 #2e9e5b}tr.s-amarillo td:first-child{box-shadow:inset 5px 0 0 #e0a800}tr.s-rojo td:first-child{box-shadow:inset 5px 0 0 #c8102e}
+.ejf .filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 12px}
+small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font-weight:700}
+.kpi.kverde{box-shadow:inset 0 4px 0 #2e9e5b,var(--shadow)}.kpi.kamarillo{box-shadow:inset 0 4px 0 #e0a800,var(--shadow)}.kpi.krojo,.kpi.kbad{box-shadow:inset 0 4px 0 #c8102e,var(--shadow)}
+.hbar{display:grid;gap:8px}.hb{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;gap:8px;align-items:center;font-size:13.5px}.hl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ht{background:var(--th);border-radius:6px;height:14px;overflow:hidden}.ht i{display:block;height:100%;background:var(--accent);border-radius:6px}.ht i.verde{background:#2e9e5b}.ht i.amarillo{background:#e0a800}.ht i.rojo{background:#c8102e}.hv{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.lsvg{width:100%;height:auto;max-height:260px}.lsvg .lin{stroke:var(--rojo);stroke-width:3}.lsvg .pt{fill:var(--rojo)}.lsvg .barf{fill:var(--accent);opacity:.35}.lsvg .tv{font-size:12px;font-weight:700;fill:var(--fg)}.lsvg .tx{font-size:11px;fill:var(--muted)}
+.ley{display:inline-block;width:14px;height:8px;border-radius:2px;vertical-align:middle}.ley.lin{background:var(--rojo)}.ley.barf{background:var(--accent);opacity:.5}
+.rank{margin:0;padding-left:22px}.rank li{margin-bottom:10px}
+.turno{border-left:6px solid var(--accent)}.turno.abierto{border-left-color:#2e9e5b}.turno button{width:100%}
+.filaTurno{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.filaTurno input[type=time]{width:auto;flex:0 0 auto}.filaTurno .chk{min-width:92px;margin:0}
 </style>
 </head>
 <body>
@@ -256,9 +270,9 @@ const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  principal:['panel','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
+  principal:['panel','ejecutivo','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
   'Administrador':['usuarios','cuenta'],
-  direccion:['tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
+  direccion:['ejecutivo','tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
   coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
   'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','inventario','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','inventario','cuenta'],
@@ -266,21 +280,21 @@ const VISTAS = {
   'Operador':['falla','historial','cuenta']
 };
 const NAV = {
-  principal:[['panel','Panel principal'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
+  principal:[['panel','Panel principal'],['ejecutivo','📊 Tablero ejecutivo'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Administrador':[['usuarios','👥 Alta de usuarios']],
-  direccion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios'],['inventario','📦 Inventario']],
+  direccion:[['ejecutivo','📊 Tablero ejecutivo'],['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios'],['inventario','📦 Inventario']],
   coordinacion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores']],
   'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Ingeniero de procesos':[['falla','🚨 Reportar falla'],['tablero','🟢 Tablero de producción'],['historial','📋 Historial de ajustes y reparaciones'],['indicadores','Indicadores']],
   'Operador':[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones']]
 };
-const INICIO = {principal:'panel','Administrador':'usuarios',direccion:'tablero',coordinacion:'tablero','Supervisor de mantenimiento':'alertas','Mecánico':'alertas','Ingeniero de procesos':'tablero','Operador':'falla'};
+const INICIO = {principal:'panel','Administrador':'usuarios',direccion:'ejecutivo',coordinacion:'tablero','Supervisor de mantenimiento':'alertas','Mecánico':'alertas','Ingeniero de procesos':'tablero','Operador':'falla'};
 
 // ===== Estado =====
 let auth=null, db=null, fb=null;
 let usuario=null, perfil=null, subs=[];
-let REG=[], PROG=[], MAQCFG={}, USUARIOS=[];
+let REG=[], PROG=[], MAQCFG={}, USUARIOS=[], TURNOS=[], CFGIND={};
 let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
@@ -400,7 +414,7 @@ function iniciar(){
   const app=fb.apps.length?fb.app():fb.initializeApp(FIREBASE_CONFIG);
   auth=app.auth();db=app.firestore();
   destino=leerDireccion();
-  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};USUARIOS=[];primeraCarga=true;pintarBanner();
+  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
     if(!u){pantallaLogin();return}
     $('app').innerHTML='<div class="card"><p class="muted">Cargando tu cuenta…</p></div>';
     let listo=false,rolAntes=null;
@@ -429,6 +443,8 @@ function suscribir(){
   subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   if(verInventario()||puedeRegistrar()){subs.push(db.collection('refacciones').onSnapshot(s=>{REF=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
     if(esAdmin()||grupo()==='direccion'){let q=db.collection('movimientos');try{if(q.orderBy)q=q.orderBy('fecha','desc').limit(80)}catch(e){}subs.push(q.onSnapshot(s=>{MOV=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()},err))}}
+  subs.push(db.collection('config').doc('indicadores').onSnapshot(s=>{CFGIND=s.exists?s.data()||{}:{};render()},e=>console.warn(e)));
+  {const tu=s=>{TURNOS=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()};if(verTurnos())subs.push(db.collection('turnos').onSnapshot(tu,e=>console.warn(e)));else if(puedeTurno())subs.push(db.collection('turnos').where('operadorUid','==',usuario.uid).onSnapshot(tu,e=>console.warn(e)))}
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
   if(esSupervisor())subs.push(db.collection('usuarios').onSnapshot(s=>{USUARIOS=s.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));render()},err));
 }
@@ -585,6 +601,7 @@ function pintarBanner(){const b=$('banner');if(!b)return;if(!usuario){b.innerHTM
   b.innerHTML=h;actualizarRelojes()}
 function actualizarRelojes(){const now=Date.now();document.querySelectorAll('[data-desde]').forEach(e=>{const d=Number(e.dataset.desde);e.textContent=d?'hace '+dur(now-d):''});const hr=$('horaTablero');if(hr)hr.textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
 let escVistas=0;
+setInterval(()=>{if(vista==='ejecutivo'&&perfil&&!formOcupado())render()},60000);
 setInterval(()=>{actualizarRelojes();if(perfil&&usuario&&turnoVencido()){cerrarPorTurno();return}if(atiende()&&misPendientes().length&&Date.now()-ultimoSonido>45000)sirena();
   if((pendSinEnterar().length||escSinEnterar().length)&&Date.now()-ultimoSuave>30000)sirenaSuave();
   const ne=escSinEnterar().length;if(ne!==escVistas){escVistas=ne;pintarBanner()}},1000);
@@ -682,6 +699,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-conf
       toast('❌ Se avisó a los mecánicos que sigue fallando.')}}
   catch(er){toast(errTxt(er));b.closest('.confirmar2').querySelectorAll('button').forEach(x=>x.disabled=false)}});
 function formFinalizar(r){return `<form id="fFinalizar" data-id="${esc(r.id)}" style="margin-top:10px"><label for="z_trab">Trabajo realizado</label><textarea id="z_trab" required maxlength="2000"></textarea>
+  <label for="z_causa">Causa de la falla <small class="muted">(opcional)</small></label><input id="z_causa" maxlength="200" placeholder="Ej. Resistencia quemada, cuchilla desgastada">
   <label for="z_aj">Ajustes efectuados</label><textarea id="z_aj" maxlength="2000" style="min-height:70px"></textarea>
   ${selRefacciones()}<label for="z_ref">${REF.length?'Otras refacciones (texto libre)':'Refacciones utilizadas (si aplica)'}</label><input id="z_ref" maxlength="250">
   <label for="z_fotos">Fotografías (opcional, hasta 3)</label><input id="z_fotos" type="file" accept="image/*" multiple>
@@ -741,6 +759,8 @@ V.ficha=()=>{
   <div class="card"><h2>Historial de mantenimiento · ${esc(m.zona)}</h2>${filas(regs,{sinMaq:true,acciones:true,vacio:'Todavía no hay trabajos registrados para esta máquina.'})}</div>
   ${esAdmin()?`<div class="card"><h2>Frecuencia del mantenimiento preventivo</h2><p class="muted">Se usa para calcular el siguiente preventivo cuando no hay uno programado en el calendario.</p>
   <form id="fCfg" class="dos"><div><label for="frec">Cada cuántos días</label><input id="frec" type="number" min="1" max="730" value="${esc(c.frecuenciaDias||'')}" placeholder="Ej. 30"></div><div style="display:flex;align-items:flex-end"><button type="submit" style="margin-top:12px">Guardar frecuencia</button></div></form></div>
+  ${formHorario(m.id)}${formUmbrales()}
+  <div class="card"><h2>Turnos registrados con QR · ${esc(m.zona)}</h2><p class="muted">Las operadoras inician y finalizan su turno al escanear el QR. Las correcciones quedan en un historial.</p>${corrTurno?formCorrTurno():`<div class="acciones" style="margin-top:0"><button class="sec mini" id="nuevoTurno">+ Registrar turno que no se capturó</button></div>`}${listaTurnosMaq(m.id)}</div>
   <div class="card"><h2>Código QR · ${esc(m.zona)}</h2><div class="qr"><div class="qrbox" id="qrbox"></div><div style="min-width:0;flex:1"><p>Este código abre directamente la ficha de la ${esc(m.nombre)} · ${esc(m.zona)}. Si el trabajador no ha iniciado sesión, primero se le piden sus datos.</p><p class="url" id="qrurl">${esc(urlQR(m.id))}</p>
   <div class="acciones"><button class="sec" id="bajarQR">Descargar QR (PNG)</button><button class="sec" id="imprimirQR">Imprimir QR de ambas líneas</button><button class="sec" id="copiarQR">Copiar enlace</button></div></div></div></div>`:''}`;
 };
@@ -753,7 +773,7 @@ function formMant(){
   <label for="m_tipo">Tipo de trabajo</label><select id="m_tipo">${TIPOS.map(t=>`<option ${pf.tipo===t?'selected':''}>${t}</option>`).join('')}${fallaEd?'<option selected>Reporte de falla</option>':''}</select>
   ${fallaEd?`<label for="m_tf">Tipo de falla</label><select id="m_tf">${TIPOS_FALLA.map(t=>`<option ${ed.tipoFalla===t?'selected':''}>${t}</option>`).join('')}</select>`:''}
   <label for="m_act">${fallaEd?'Descripción del problema':'Descripción de las actividades realizadas'}</label><textarea id="m_act" required maxlength="2000">${esc(pf.actividad||'')}</textarea>
-  ${fallaEd?`<label for="m_trab">Trabajo realizado</label><textarea id="m_trab" maxlength="2000">${esc(ed.trabajoRealizado||'')}</textarea><label for="m_aj">Ajustes efectuados</label><textarea id="m_aj" maxlength="2000">${esc(ed.ajustes||'')}</textarea>`:''}
+  ${fallaEd?`<label for="m_causa">Causa de la falla</label><input id="m_causa" maxlength="200" value="${esc(ed.causa||'')}"><label for="m_trab">Trabajo realizado</label><textarea id="m_trab" maxlength="2000">${esc(ed.trabajoRealizado||'')}</textarea><label for="m_aj">Ajustes efectuados</label><textarea id="m_aj" maxlength="2000">${esc(ed.ajustes||'')}</textarea>`:''}
   ${ed?'':selRefacciones()}<label for="m_ref">${!ed&&REF.length?'Otras refacciones (texto libre)':'Refacciones utilizadas'}</label><input id="m_ref" maxlength="250" value="${esc(pf.refacciones||'')}" placeholder="Ej. Resistencia de sellado, banda">
   <div class="dos"><div><label for="m_min">Duración en minutos</label><input id="m_min" type="number" inputmode="numeric" min="0" max="100000" value="${esc(pf.minutos||'')}"></div>
   <div><label for="m_est">Estado</label><select id="m_est">${(fallaEd?['Pendiente','En atención',POR_CONFIRMAR,'Cerrada']:['Completado','En proceso','Pendiente']).map(o=>`<option ${pf.estado===o||(fallaEd&&o==='Pendiente'&&pf.estado==='Abierta')||(fallaEd&&o==='En atención'&&pf.estado==='En proceso')?'selected':''}>${o}</option>`).join('')}</select></div></div>
@@ -762,7 +782,7 @@ function formMant(){
 }
 V.registrar=()=>!editId&&!puedeRegistrar()?'<div class="card"><h2>Registrar trabajo</h2><p>Los trabajos los registran los mecánicos. Desde «Trabajos registrados» puedes corregir o cerrar un registro con el botón Editar.</p></div>':formMant();
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));const porConf=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r)).sort((a,b)=>(ms(a.finAtencion)||0)-(ms(b.finAtencion)||0));
-  return `${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
+  return `${tarjetaTurno()}${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
   ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
     if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.zona)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
     return `<label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>`})()}
@@ -851,6 +871,7 @@ function formRef(x){const nuevo=!x;x=x||{};return `<div class="card"><h2>${nuevo
   <div class="dos"><div><label for="r_cod">Código</label><input id="r_cod" maxlength="40" value="${esc(x.codigo||'')}"></div><div><label for="r_nom">Refacción</label><input id="r_nom" required maxlength="120" value="${esc(x.nombre||'')}"></div></div>
   <div class="dos"><div><label for="r_uni">Unidad</label><input id="r_uni" maxlength="20" value="${esc(x.unidad||'pza')}"></div><div><label for="r_ubi">Ubicación</label><input id="r_ubi" maxlength="60" value="${esc(x.ubicacion||'')}"></div></div>
   <div class="dos"><div>${nuevo?`<label for="r_exi">Existencia</label><input id="r_exi" type="number" step="any" min="0" required value="0">`:`<label>Existencia actual</label><input value="${Number(x.existencia)||0}" disabled>`}</div><div><label for="r_min">Mínimo (avisar al llegar a)</label><input id="r_min" type="number" step="any" min="0" value="${esc(x.minimo??1)}"></div></div>
+  <label for="r_cos">Costo unitario $ <small class="muted">(opcional, para el costo de mantenimiento en el reporte)</small></label><input id="r_cos" type="number" step="any" min="0" inputmode="decimal" value="${esc(x.costo??'')}">
   ${nuevo?'':`<div class="dos"><div><label for="r_ent">Entrada (+ piezas que llegaron)</label><input id="r_ent" type="number" step="any" min="0" placeholder="0"></div><div><label for="r_aju">O ajustar existencia a</label><input id="r_aju" type="number" step="any" min="0" placeholder="Conteo físico"></div></div>`}
   <div class="acciones"><button type="submit">${nuevo?'Agregar':'Guardar'}</button><button type="button" class="sec" id="cancelRef">Cancelar</button></div><div id="rErr2"></div></form></div>`}
 V.inventario=()=>{const q=invFiltro.toLowerCase();const lista=REF.filter(x=>!q||[x.codigo,x.nombre,x.ubicacion].join(' ').toLowerCase().includes(q)).sort((a,b)=>(bajoMinimo(b)-bajoMinimo(a))||String(a.nombre).localeCompare(b.nombre));
@@ -869,11 +890,11 @@ V.inventario=()=>{const q=invFiltro.toLowerCase();const lista=REF.filter(x=>!q||
   :`<p class="muted">Todavía no hay refacciones registradas.${ges?' Carga tu inventario con el botón «Cargar desde Excel o CSV». El archivo necesita una fila de títulos con estas columnas: <b>Código, Refacción, Existencia, Mínimo, Unidad, Ubicación</b> (Código, Unidad y Ubicación son opcionales).':''}</p>`}</div>
   ${(ges||grupo()==='direccion')&&MOV.length?`<div class="card"><h2>Movimientos recientes</h2>${MOV.slice().sort((a,b)=>(ms(b.fecha)||0)-(ms(a.fecha)||0)).slice(0,30).map(m=>`<div class="item"><div><b>${esc(m.nombre||'')}</b> · ${esc(m.tipo)} ${m.cantidad!=null?(m.tipo==='Salida'?'−':'+')+esc(m.cantidad):''}${m.equipo?' · '+tagMaq(m.equipo):''}<br><small class="muted">${esc(m.usuario||'')} · ${ms(m.fecha)?new Date(ms(m.fecha)).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</small></div></div>`).join('')}</div>`:''}`};
 function sinAcentos(t){return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim()}
-const COLS={codigo:['codigo','clave','sku','no. parte','numero de parte','num parte','parte','no parte'],nombre:['refaccion','nombre','descripcion','articulo','pieza','producto'],existencia:['existencia','cantidad','stock','inventario','existencias','cant'],minimo:['minimo','stock minimo','min','punto de reorden','reorden'],unidad:['unidad','um','u.m.','unidad de medida'],ubicacion:['ubicacion','almacen','lugar','anaquel','rack']};
+const COLS={codigo:['codigo','clave','sku','no. parte','numero de parte','num parte','parte','no parte'],nombre:['refaccion','nombre','descripcion','articulo','pieza','producto'],existencia:['existencia','cantidad','stock','inventario','existencias','cant'],minimo:['minimo','stock minimo','min','punto de reorden','reorden'],unidad:['unidad','um','u.m.','unidad de medida'],ubicacion:['ubicacion','almacen','lugar','anaquel','rack'],costo:['costo','costo unitario','precio','precio unitario','costo unit']};
 function mapearFilas(rows){let h=-1,idx={};for(let i=0;i<Math.min(rows.length,10)&&h<0;i++){const fila=(rows[i]||[]).map(sinAcentos);const tmp={};Object.entries(COLS).forEach(([k,al])=>{const j=fila.findIndex(c=>al.includes(c));if(j>=0)tmp[k]=j});if(tmp.nombre!=null){h=i;idx=tmp}}
   if(h<0)throw new Error('No encontré la columna «Refacción» (o «Nombre» / «Descripción») en la fila de títulos.');
   const num=v=>{const n=Number(String(v??'').replace(',','.').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n};
-  return rows.slice(h+1).map(f=>({codigo:String(f[idx.codigo]??'').trim(),nombre:String(f[idx.nombre]??'').trim(),existencia:idx.existencia!=null?num(f[idx.existencia]):0,minimo:idx.minimo!=null?num(f[idx.minimo]):1,unidad:idx.unidad!=null?String(f[idx.unidad]??'').trim()||'pza':'pza',ubicacion:idx.ubicacion!=null?String(f[idx.ubicacion]??'').trim():''})).filter(f=>f.nombre)}
+  return rows.slice(h+1).map(f=>({codigo:String(f[idx.codigo]??'').trim(),nombre:String(f[idx.nombre]??'').trim(),existencia:idx.existencia!=null?num(f[idx.existencia]):0,minimo:idx.minimo!=null?num(f[idx.minimo]):1,unidad:idx.unidad!=null?String(f[idx.unidad]??'').trim()||'pza':'pza',ubicacion:idx.ubicacion!=null?String(f[idx.ubicacion]??'').trim():'',costo:idx.costo!=null&&String(f[idx.costo]??'').trim()!==''?num(f[idx.costo]):undefined})).filter(f=>f.nombre)}
 function leerCSV(t){const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':',';const out=[];let fila=[],c='',q=false;
   for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'&&t[i+1]==='"'){c+='"';i++}else if(ch==='"')q=false;else c+=ch}else if(ch==='"')q=true;else if(ch===sep){fila.push(c);c=''}else if(ch==='\n'){fila.push(c.replace(/\r$/,''));out.push(fila);fila=[];c=''}else c+=ch}
   if(c||fila.length){fila.push(c);out.push(fila)}return out}
@@ -883,7 +904,7 @@ async function leerArchivoInv(file){let rows;if(/\.csv$/i.test(file.name)||file.
   const nuevas=filas.filter(f=>!buscarRef(f)).length;importPrev={archivo:file.name,filas,nuevas};render(true)}
 function buscarRef(f){const c=sinAcentos(f.codigo),n=sinAcentos(f.nombre);return REF.find(x=>(c&&sinAcentos(x.codigo)===c)||(!c&&sinAcentos(x.nombre)===n))}
 async function confirmarImport(btn){btn.disabled=true;btn.textContent='Cargando…';try{const filas=importPrev.filas;
-  for(let i=0;i<filas.length;i+=400){const batch=db.batch();filas.slice(i,i+400).forEach(f=>{const ex=buscarRef(f);const d={codigo:f.codigo,nombre:f.nombre,unidad:f.unidad,existencia:f.existencia,minimo:f.minimo,ubicacion:f.ubicacion,actualizado:TS()};
+  for(let i=0;i<filas.length;i+=400){const batch=db.batch();filas.slice(i,i+400).forEach(f=>{const ex=buscarRef(f);const d={codigo:f.codigo,nombre:f.nombre,unidad:f.unidad,existencia:f.existencia,minimo:f.minimo,ubicacion:f.ubicacion,actualizado:TS()};if(f.costo!==undefined)d.costo=f.costo;
     if(ex)batch.update(db.collection('refacciones').doc(ex.id),d);else batch.set(db.collection('refacciones').doc(),d)});await batch.commit()}
   await db.collection('movimientos').doc().set({tipo:'Carga de archivo',nombre:importPrev.archivo,cantidad:filas.length,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()});
   toast('📦 '+filas.length+' refacciones cargadas.');importPrev=null;render(true)}catch(e){toast(errTxt(e));btn.disabled=false;btn.textContent='Reintentar'}}
@@ -956,14 +977,369 @@ async function verFotos(ids){const v=$('visor');v.hidden=false;v.innerHTML='<p s
 // ===== Escritura =====
 const TS=()=>fb.firestore.FieldValue.serverTimestamp();
 function num(v){return v===''||v==null?'':String(Number(v))}
+// ===== Indicadores ejecutivos: paros, disponibilidad y semáforo =====
+const DIA=86400000,SEMANA=7*DIA;
+const SEM_DEF={verde:10,rojo:18}; // % de horas programadas perdidas por paro
+const SEM_TXT={verde:'Buen desempeño',amarillo:'Requiere atención',rojo:'Crítico'},SEM_ICO={verde:'🟢',amarillo:'🟡',rojo:'🔴'};
+const DIAS_TXT=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const TURNOS_SUG=[{nombre:'Turno 1',inicio:'06:00',fin:'14:00'},{nombre:'Turno 2',inicio:'14:00',fin:'22:00'},{nombre:'Turno 3',inicio:'22:00',fin:'06:00'}];
+function umbrales(){const v=Number(CFGIND.verde),r=Number(CFGIND.rojo);return v>0&&r>v&&r<100?{verde:v,rojo:r}:SEM_DEF}
+function semaforo(perdPct){if(perdPct==null||isNaN(perdPct))return null;const u=umbrales();return perdPct<u.verde?'verde':perdPct<u.rojo?'amarillo':'rojo'}
+function pillSem(s){return s?`<span class="sem ${s}">${SEM_ICO[s]} ${SEM_TXT[s]}</span>`:'<span class="sem nd">N/D</span>'}
+// Horario programado (con versiones: cada cambio aplica desde el día en que se guardó)
+function horarios(id){const c=MAQCFG[id]||{};const ok=h=>h&&Array.isArray(h.turnos)&&h.turnos.length&&Array.isArray(h.dias)&&h.dias.length;let l=Array.isArray(c.horarios)?c.horarios.filter(ok):[];if(!l.length&&ok(c.horario))l=[Object.assign({desde:0},c.horario)];return l.slice().sort((a,b)=>(a.desde||0)-(b.desde||0))}
+function horario(id){const l=horarios(id);return l.length?l[l.length-1]:null}
+function horarioDel(l,t){let h=l[0];l.forEach(x=>{if((x.desde||0)<=t)h=x});return h}
+function hm(s){const p=String(s||'').split(':');return (Number(p[0])||0)*60+(Number(p[1])||0)}
+function unir(ints){const s=ints.filter(x=>x[1]>x[0]).sort((x,y)=>x[0]-y[0]),o=[];s.forEach(x=>{const l=o[o.length-1];if(l&&x[0]<=l[1])l[1]=Math.max(l[1],x[1]);else o.push([x[0],x[1]])});return o}
+function largo(ints){return ints.reduce((t,x)=>t+x[1]-x[0],0)}
+function cruce(A,B){let t=0,i=0,j=0;while(i<A.length&&j<B.length){const x=Math.max(A[i][0],B[j][0]),y=Math.min(A[i][1],B[j][1]);if(y>x)t+=y-x;if(A[i][1]<B[j][1])i++;else j++}return t}
+function turnosDelDia(l,d){const h=horarioDel(l,d.getTime()+DIA-1);if(!h||!h.dias.map(Number).includes(d.getDay()))return [];
+  return h.turnos.map(x=>{const i=hm(x.inicio),f=hm(x.fin);if(i===f)return null;const s=new Date(d.getTime()),e=new Date(d.getTime());s.setMinutes(i);e.setMinutes(f<i?f+1440:f);return {nombre:x.nombre,a:s.getTime(),b:e.getTime()}}).filter(Boolean)}
+function ventanas(id,a,b){const l=horarios(id);if(!l.length||b<=a)return null;const out=[],d=new Date(a);d.setHours(0,0,0,0);d.setDate(d.getDate()-1);
+  for(;d.getTime()<b;d.setDate(d.getDate()+1))turnosDelDia(l,d).forEach(t=>out.push([Math.max(a,t.a),Math.min(b,t.b)]));
+  return unir(out)}
+function turnoEn(id,t){const l=horarios(id);if(!l.length)return null;for(const tt of [t,t+3600000]){for(const off of [0,-1]){const d=new Date(tt);d.setHours(0,0,0,0);d.setDate(d.getDate()+off);const x=turnosDelDia(l,d).find(w=>tt>=w.a&&tt<w.b);if(x)return x}}return null}
+function inicioDia(t){const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()}
+function inicioSemana(t){const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()}
+function fCorta(t){return new Date(t).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}
+function fLarga(t){return new Date(t).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
+function rangoTxt(a,b){return fLarga(a)+' – '+fLarga(b-1)}
+function msReg(r){const c=msCreado(r);if(c)return c;if(!r.fecha)return 0;const t=Date.parse(r.fecha+'T'+(/^\d\d:\d\d$/.test(r.hora||'')?r.hora:'12:00')+':00');return isNaN(t)?0:t}
+function lineaDetenida(r){if(r.severidad==='Paro de línea')return 'Detenida';if(r.severidad==='Sin paro')return 'Siguió trabajando';if(Number(r.paro)>0)return 'Detenida';return 'N/D'}
+// Intervalo real de paro de un reporte: del reporte a que la línea vuelve a producir
+function intParo(r,now){
+  if(esFalla(r)&&r.severidad==='Paro de línea'){const a=msCreado(r);if(!a)return null;let b=ms(r.lineaReanudaEn),est='ok';
+    if(!b){if(r.estado===POR_CONFIRMAR&&ms(r.finAtencion)){b=ms(r.finAtencion);est='prov'}else if(!CERRADOS.includes(r.estado)){b=now;est='curso'}else return null}
+    return b>a?[a,b,est]:null}
+  const p=Number(r.paro);if(p>0){const a=msReg(r);return a?[a,a+p*60000,'min']:null}
+  return null}
+function prom(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
+function horasTurnoQR(id,a,b,now){return largo(unir(TURNOS.filter(t=>t.equipo===id).map(t=>{const i=ms(t.inicio);if(!i)return null;const f=ms(t.fin)||(t.estado==='Abierto'?Math.min(now,Number(t.finProgramadoMs)||now):null);return f?[Math.max(i,a),Math.min(f,b)]:null}).filter(Boolean)))}
+function calcMaq(m,a,b,now){const fin=Math.min(b,now);
+  const todos=REG.filter(r=>r.equipo===m.id),regs=todos.filter(r=>{const t=msReg(r);return t>=a&&t<b});
+  const fallas=regs.filter(esFalla),conParo=regs.filter(r=>lineaDetenida(r)==='Detenida');
+  const ints=[];let enCurso=false;todos.forEach(r=>{const x=intParo(r,now);if(!x)return;const p=[Math.max(x[0],a),Math.min(x[1],fin)];if(p[1]>p[0]){ints.push(p);if(x[2]==='curso')enCurso=true}});
+  const u=unir(ints),paroTot=largo(u),v=ventanas(m.id,a,fin),prog=v?largo(v):null,paroProg=v?cruce(u,v):null;
+  const perdido=v?paroProg:paroTot,perdPct=prog?paroProg/prog*100:null;
+  const resp=fallas.map(r=>tiempos(r).resp).filter(x=>x!=null&&x>=0),rep=fallas.map(r=>tiempos(r).rep).filter(x=>x!=null&&x>=0);
+  return {m,regs,fallas,nf:fallas.length,paros:conParo.length,veces:u.length,paroTot,prog,paroProg,perdido,perdPct,disp:prog?Math.max(0,1-paroProg/prog):null,sem:semaforo(perdPct),resp,rep,
+    resueltas:fallas.filter(r=>CERRADOS.includes(r.estado)).length,trabajos:regs.length-fallas.length,sinFin:conParo.filter(r=>!intParo(r,now)).length,turnoH:horasTurnoQR(m.id,a,fin,now),enCurso,sinHorario:!v}}
+function agregar(l){const sum=k=>l.reduce((t,x)=>t+(x[k]||0),0),cp=l.filter(x=>x.prog!=null),P=cp.reduce((t,x)=>t+x.prog,0),PP=cp.reduce((t,x)=>t+x.paroProg,0),perdPct=P?PP/P*100:null;
+  return {n:l.length,nf:sum('nf'),paros:sum('paros'),veces:sum('veces'),paroTot:sum('paroTot'),perdido:sum('perdido'),prog:cp.length?P:null,paroProg:cp.length?PP:null,perdPct,disp:P?Math.max(0,1-PP/P):null,sem:semaforo(perdPct),
+    resp:[].concat(...l.map(x=>x.resp)),rep:[].concat(...l.map(x=>x.rep)),resueltas:sum('resueltas'),trabajos:sum('trabajos'),sinFin:sum('sinFin'),turnoH:sum('turnoH'),sinHorario:l.filter(x=>x.sinHorario).length,enCurso:l.some(x=>x.enCurso)}}
+function filtraMaq(f){return MAQUINAS.filter(m=>(!f.area||m.planta===f.area)&&(!f.linea||m.zona===f.linea)&&(!f.maq||m.id===f.maq))}
+function calcular(a,b,f,now){now=now||Date.now();const maqs=filtraMaq(f).map(m=>calcMaq(m,a,b,now));
+  const areas=[...new Set(maqs.map(x=>x.m.planta))].map(ar=>{const ms_=maqs.filter(x=>x.m.planta===ar);const lineas=[...new Set(ms_.map(x=>x.m.zona))].map(li=>{const l=ms_.filter(x=>x.m.zona===li);return {linea:li,maqs:l,t:agregar(l)}});return {area:ar,lineas,maqs:ms_,t:agregar(ms_)}});
+  return {a,b,now,maqs,areas,t:agregar(maqs)}}
+function mecanicos(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{if(!r.atendidoPor)return;const k=r.atendidoPor;const o=g[k]||(g[k]={nombre:k,n:0,resp:[],rep:[],paros:0});o.n++;const t=tiempos(r);if(t.resp!=null&&t.resp>=0)o.resp.push(t.resp);if(t.rep!=null&&t.rep>=0)o.rep.push(t.rep);if(lineaDetenida(r)==='Detenida')o.paros++}));return Object.values(g).sort((a,b)=>b.n-a.n)}
+function causas(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{const k=r.tipoFalla||'Sin clasificar';const o=g[k]||(g[k]={tipo:k,n:0,ints:[]});o.n++;const i=intParo(r,D.now);if(i)o.ints.push([Math.max(i[0],D.a),Math.min(i[1],Math.min(D.b,D.now))])}));return Object.values(g).map(o=>Object.assign(o,{perdido:largo(unir(o.ints))})).sort((a,b)=>b.n-a.n||b.perdido-a.perdido)}
+function refsDe(r){if(Array.isArray(r.refaccionesUsadas)&&r.refaccionesUsadas.length)return r.refaccionesUsadas.map(x=>({nombre:x.nombre,codigo:x.codigo||'',cantidad:Number(x.cantidad)||0,unidad:x.unidad||'',id:x.id}));return r.refacciones?[{nombre:r.refacciones,codigo:'',cantidad:null,unidad:'',id:null}]:[]}
+function repetitivas(D,min){min=min||2;const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{const k=x.m.id+'|'+(r.tipoFalla||'Sin clasificar');const o=g[k]||(g[k]={m:x.m,tipo:r.tipoFalla||'Sin clasificar',n:0,ints:[],mec:new Set(),refs:{}});o.n++;if(r.atendidoPor)o.mec.add(r.atendidoPor);
+  const i=intParo(r,D.now);if(i)o.ints.push([Math.max(i[0],D.a),Math.min(i[1],Math.min(D.b,D.now))]);refsDe(r).forEach(f=>{o.refs[f.nombre]=(o.refs[f.nombre]||0)+(f.cantidad||0)})}));
+  return Object.values(g).filter(o=>o.n>=min).map(o=>Object.assign(o,{perdido:largo(unir(o.ints)),mecTxt:[...o.mec].join(', ')||'—',refTxt:Object.entries(o.refs).map(([k,v])=>v?k+' ×'+v:k).join(', ')||'—'})).sort((a,b)=>b.n-a.n||b.perdido-a.perdido)}
+function semanasHasta(t,n,f,now){const w=inicioSemana(t),out=[];for(let k=n-1;k>=0;k--){const a=w-k*SEMANA;if(a>now)continue;const D=calcular(a,a+SEMANA,f,now);out.push({a,b:a+SEMANA,t:D.t})}return out}
+const h1=x=>x==null?null:Math.round(x/36000)/100, m1=x=>x==null?null:Math.round(x/6000)/10;
+function primerRegistro(){const l=REG.map(msReg).filter(x=>x>0);return l.length?Math.min(...l):Date.now()}
+
+// ===== Tablero ejecutivo (Dirección y Gerencia) =====
+let EJ={per:'semana',dia:'',desde:'',hasta:'',area:'',linea:'',maq:''};
+function periodo(sel){const now=Date.now(),w=inicioSemana(now),s=sel||EJ;
+  if(s.per==='anterior')return {a:w-SEMANA,b:w,txt:'Semana anterior'};
+  if(s.per==='7d')return {a:now-SEMANA,b:now,txt:'Últimos 7 días'};
+  if(s.per==='sem'){const x=inicioSemana(s.dia?aFecha(s.dia).getTime():now);return {a:x,b:x+SEMANA,txt:'Semana del '+fCorta(x)+' al '+fCorta(x+SEMANA-1)}}
+  if(s.per==='rango'){const a=s.desde?new Date(s.desde+'T00:00:00').getTime():w;let b=s.hasta?new Date(s.hasta+'T00:00:00').getTime()+DIA:now;if(b<=a)b=a+DIA;return {a,b,txt:'Del '+fLarga(a)+' al '+fLarga(b-1)}}
+  if(s.per==='todo')return {a:inicioDia(primerRegistro()),b:now+1,txt:'Historial completo',todo:true};
+  return {a:w,b:w+SEMANA,txt:'Esta semana'}}
+function previo(P){if(P.todo)return null;const fin=Math.min(P.b,Date.now()),len=P.b-P.a;return {a:P.a-len,b:fin-len}}
+function delta(act,ant,menosEsMejor,fmtF){if(act==null||ant==null)return '<small class="muted">Sin comparación</small>';const d=act-ant;if(Math.abs(d)<1e-9)return '<small class="muted">= Igual que el periodo anterior</small>';const mejor=menosEsMejor?d<0:d>0;return `<small class="${mejor?'mejora':'empeora'}">${d>0?'▲':'▼'} ${fmtF(Math.abs(d))} · ${mejor?'Mejoró':'Empeoró'}</small>`}
+const pct=x=>x==null?'N/D':(Math.round(x*1000)/10).toFixed(1)+' %';
+const durN=x=>x==null?'N/D':durMin(x);
+function kpiE(v,t,d,cls){return `<div class="card kpi ${cls||''}"><h2>${v}</h2><span>${t}</span>${d?'<div>'+d+'</div>':''}</div>`}
+function hbar(items,fmtF){const mx=Math.max(...items.map(x=>x.v||0),0);if(!items.length||!mx)return '<p class="muted">Sin datos en el periodo.</p>';return `<div class="hbar">${items.map(x=>`<div class="hb"><span class="hl">${esc(x.l)}</span><span class="ht"><i class="${x.c||''}" style="width:${Math.max(2,(x.v||0)/mx*100)}%"></i></span><span class="hv">${esc(fmtF(x.v))}</span></div>`).join('')}</div>`}
+function lineaSVG(sem){if(sem.length<2)return '<p class="muted">Se necesitan al menos dos semanas con datos.</p>';const W=640,H=200,p=34,vals=sem.map(s=>h1(s.t.perdido)||0),fal=sem.map(s=>s.t.nf),mx=Math.max(...vals,1),mf=Math.max(...fal,1),x=i=>p+i*(W-2*p)/(sem.length-1),y=v=>H-p-(v/mx)*(H-2*p);
+  const bw=Math.min(28,(W-2*p)/sem.length*0.5);
+  return `<svg viewBox="0 0 ${W} ${H}" class="lsvg" role="img" aria-label="Evolución semanal de horas de paro y fallas">${sem.map((s,i)=>`<rect x="${x(i)-bw/2}" y="${H-p-(fal[i]/mf)*(H-2*p)*0.6}" width="${bw}" height="${(fal[i]/mf)*(H-2*p)*0.6}" class="barf"><title>${fal[i]} fallas</title></rect>`).join('')}
+  <polyline fill="none" class="lin" points="${vals.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" class="pt"><title>${v} h de paro</title></circle><text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" class="tv">${v}</text><text x="${x(i)}" y="${H-12}" text-anchor="middle" class="tx">${fCorta(sem[i].a)}</text>`).join('')}</svg>
+  <p class="muted" style="margin:4px 0 0"><span class="ley lin"></span> Horas de paro &nbsp; <span class="ley barf"></span> Número de fallas</p>`}
+function filaSem(nivel,nombre,t,extra){return `<tr class="niv${nivel} s-${t.sem||'nd'}"><td>${nombre}</td><td class="num">${t.nf}</td><td class="num">${t.paros}</td><td class="num">${durN(t.perdido)}${t.enCurso?' <small class="tag bad">en curso</small>':''}</td><td class="num">${durN(prom(t.resp))}</td><td class="num">${pct(t.disp)}</td><td>${pillSem(t.sem)}</td></tr>`}
+function opts(l,sel,todos){return `<option value="">${todos}</option>`+l.map(x=>`<option value="${esc(x[0])}" ${x[0]===sel?'selected':''}>${esc(x[1])}</option>`).join('')}
+V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea,maq:EJ.maq};const D=calcular(P.a,P.b,f,now),T=D.t,pv=previo(P),A=pv?calcular(pv.a,pv.b,f,now).t:null;
+  const sem=semanasHasta(Math.min(P.b-1,now),8,f,now),mec=mecanicos(D),cau=causas(D),rep=repetitivas(D),top=D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).slice(0,5);
+  const lineasDisp=[...new Set(MAQUINAS.filter(m=>!EJ.area||m.planta===EJ.area).map(m=>m.zona))],maqDisp=MAQUINAS.filter(m=>(!EJ.area||m.planta===EJ.area)&&(!EJ.linea||m.zona===EJ.linea));
+  const nom=m=>m.nombre+' · '+m.planta+' · '+m.zona,sinH=D.maqs.filter(x=>x.sinHorario);
+  return `<div class="card ejf"><h2>📊 Tablero ejecutivo de mantenimiento</h2><p class="muted" style="margin:-4px 0 10px">${esc(P.txt)} · ${rangoTxt(P.a,Math.min(P.b,now+1))}${pv?' · comparado con '+rangoTxt(pv.a,pv.b+1):''}</p>
+  <div class="filtros"><div><label for="ej_per">Periodo</label><select id="ej_per">${[['semana','Esta semana'],['anterior','Semana anterior'],['7d','Últimos 7 días'],['sem','Elegir una semana'],['rango','Rango de fechas'],['todo','Historial completo']].map(o=>`<option value="${o[0]}" ${EJ.per===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+  ${EJ.per==='sem'?`<div><label for="ej_dia">Cualquier día de la semana</label><input id="ej_dia" type="date" value="${esc(EJ.dia||hoy())}"></div>`:''}
+  ${EJ.per==='rango'?`<div><label for="ej_des">Desde</label><input id="ej_des" type="date" value="${esc(EJ.desde||iso(new Date(inicioSemana(now))))}"></div><div><label for="ej_has">Hasta</label><input id="ej_has" type="date" value="${esc(EJ.hasta||hoy())}"></div>`:''}
+  <div><label for="ej_area">Área</label><select id="ej_area">${opts(PLANTAS.filter(p=>maquinasDe(p).length).map(p=>[p,p]),EJ.area,'Todas las áreas')}</select></div>
+  <div><label for="ej_lin">Línea</label><select id="ej_lin">${opts(lineasDisp.map(l=>[l,l]),EJ.linea,'Todas las líneas')}</select></div>
+  <div><label for="ej_maq">Máquina</label><select id="ej_maq">${opts(maqDisp.map(m=>[m.id,nom(m)]),EJ.maq,'Todas las máquinas')}</select></div></div>
+  <div class="acciones"><button id="xlsPer">📥 Excel del periodo</button><button class="sec" id="xls7">📥 Últimos 7 días</button><button class="sec" id="xlsTodo">📥 Historial completo</button></div><div id="xlsMsg"></div></div>
+  ${sinH.length?`<div class="aviso">⚠️ ${sinH.map(x=>esc(x.m.zona+' ('+x.m.planta+')')).join(', ')} no tiene${sinH.length>1?'n':''} horario programado, así que su disponibilidad aparece como N/D. ${esAdmin()?'Configúralo en <b>Máquinas → Ficha técnica → Horario programado</b>.':'El Administrador principal o el Supervisor de mantenimiento lo configuran en la ficha de la máquina.'}</div>`:''}
+  <div class="grid">${kpiE(durN(T.perdido),'Tiempo total de paro (producción perdida)',delta(T.perdido,A&&A.perdido,true,durMin),T.enCurso?'kbad':'')}
+  ${kpiE(T.veces,'Paros reales (veces que se detuvo)',delta(T.veces,A&&A.veces,true,x=>String(x)))}
+  ${kpiE(T.nf,'Reportes de falla',delta(T.nf,A&&A.nf,true,x=>String(x)))}
+  ${kpiE(pct(T.disp),'Disponibilidad general',delta(T.disp,A&&A.disp,false,x=>(Math.round(x*1000)/10)+' pts'),T.sem?'k'+T.sem:'')}
+  ${kpiE(durN(prom(T.resp)),'Tiempo promedio de respuesta',delta(prom(T.resp),A&&prom(A.resp),true,durMin))}
+  ${kpiE(durN(prom(T.rep)),'Tiempo promedio de reparación',delta(prom(T.rep),A&&prom(A.rep),true,durMin))}</div>
+  <div class="card"><h2>Semáforo por área, línea y máquina</h2><p class="muted" style="margin-top:-4px">🟢 pierde menos del ${umbrales().verde}% de sus horas programadas · 🟡 del ${umbrales().verde}% a menos del ${umbrales().rojo}% · 🔴 ${umbrales().rojo}% o más. Meta: disponibilidad mayor a 80%.</p>
+  <div class="scroll"><table class="semtab"><thead><tr><th>Área / línea / máquina</th><th>Reportes</th><th>Paros</th><th>Tiempo perdido</th><th>Resp. prom.</th><th>Disponibilidad</th><th>Semáforo</th></tr></thead><tbody>
+  ${D.areas.map(ar=>filaSem(0,'<b>'+esc(ar.area)+'</b>',ar.t)+ar.lineas.map(li=>filaSem(1,esc(li.linea),li.t)+li.maqs.map(x=>filaSem(2,esc(x.m.nombre),x)).join('')).join('')).join('')}
+  ${D.areas.length>1?filaSem(0,'<b>Total</b>',T):''}</tbody></table></div></div>
+  <div class="grid2"><div class="card"><h2>Tiempo perdido por área</h2>${hbar(D.areas.map(x=>({l:x.area,v:x.t.perdido,c:x.t.sem})),durMin)}</div>
+  <div class="card"><h2>Tiempo perdido por línea</h2>${hbar([].concat(...D.areas.map(ar=>ar.lineas.map(li=>({l:li.linea+(D.areas.length>1?' · '+ar.area:''),v:li.t.perdido,c:li.t.sem})))),durMin)}</div>
+  <div class="card"><h2>Tiempo perdido por máquina</h2>${hbar(D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).map(x=>({l:x.m.zona+' · '+x.m.nombre,v:x.perdido,c:x.sem})),durMin)}</div>
+  <div class="card"><h2>Máquinas con más fallas</h2>${hbar(D.maqs.slice().sort((x,y)=>y.nf-x.nf).map(x=>({l:x.m.zona+' · '+x.m.nombre,v:x.nf})),v=>v+(v===1?' falla':' fallas'))}</div>
+  <div class="card"><h2>Principales causas de falla</h2>${hbar(cau.slice(0,8).map(c=>({l:c.tipo,v:c.n})),v=>v+(v===1?' falla':' fallas'))}</div>
+  </div><div class="card"><h2>Comparación con el periodo anterior</h2>${A?`<div class="scroll"><table><thead><tr><th></th><th>Anterior</th><th>Actual</th><th>Resultado</th></tr></thead><tbody>
+    ${[['Horas de paro',h1(A.perdido)+' h',h1(T.perdido)+' h',delta(T.perdido,A.perdido,true,durMin)],['Fallas',A.nf,T.nf,delta(T.nf,A.nf,true,String)],['Paros reales',A.veces,T.veces,delta(T.veces,A.veces,true,String)],['Disponibilidad',pct(A.disp),pct(T.disp),delta(T.disp,A.disp,false,x=>(Math.round(x*1000)/10)+' pts')],['Respuesta prom.',durN(prom(A.resp)),durN(prom(T.resp)),delta(prom(T.resp),prom(A.resp),true,durMin)]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num"><b>${r[2]}</b></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">El historial completo no tiene periodo anterior para comparar.</p>'}</div>
+  <div class="card"><h2>Evolución semanal (últimas ${sem.length} semanas)</h2>${lineaSVG(sem)}</div>
+  <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.zona)}</b> <small class="muted">${esc(x.m.planta)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s) ${pillSem(x.sem)}</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
+  <div class="card"><h2>Intervenciones por mecánico</h2>${mec.length?`<div class="scroll"><table><thead><tr><th>Mecánico</th><th>Intervenciones</th><th>Resp. prom.</th><th>Reparación prom.</th></tr></thead><tbody>${mec.map(x=>`<tr><td>${esc(x.nombre)}</td><td class="num">${x.n}</td><td class="num">${durN(prom(x.resp))}</td><td class="num">${durN(prom(x.rep))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Sin intervenciones en el periodo.</p>'}</div></div>
+  <div class="card"><h2>🔁 Fallas repetitivas</h2>${rep.length?`<div class="scroll"><table><thead><tr><th>Máquina</th><th>Tipo de falla</th><th>Veces</th><th>Tiempo perdido</th><th>Mecánicos</th><th>Refacciones</th></tr></thead><tbody>${rep.map(o=>`<tr class="${o.n>=3?'s-rojo':'s-amarillo'}"><td>${esc(o.m.nombre+' · '+o.m.zona)}</td><td>${esc(o.tipo)}</td><td class="num"><b>${o.n}</b></td><td class="num">${o.perdido?durMin(o.perdido):'0 min'}</td><td>${esc(o.mecTxt)}</td><td><small>${esc(o.refTxt)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No hay fallas que se repitan (mismo tipo en la misma máquina) en el periodo.</p>'}</div>
+  <p class="muted"><small>Tiempo de respuesta: del reporte a que el mecánico empieza. Reparación: de que empieza a que termina. Paro: del reporte a que la línea vuelve a producir; si hay reportes al mismo tiempo en una máquina, el tiempo se cuenta una sola vez. Las fallas que no detuvieron la línea cuentan como reportes, pero no como tiempo perdido. N/D = dato no disponible.</small></p>`};
+function enlazarEjecutivo(){if(vista!=='ejecutivo')return;
+  const on=(id,k)=>{const e=$(id);if(e)e.onchange=()=>{EJ[k]=e.value;if(k==='area'){EJ.linea='';EJ.maq=''}if(k==='linea')EJ.maq='';render(true)}};
+  on('ej_per','per');on('ej_dia','dia');on('ej_des','desde');on('ej_has','hasta');on('ej_area','area');on('ej_lin','linea');on('ej_maq','maq');
+  const go=(id,sel)=>{const b=$(id);if(b)b.onclick=async()=>{const bs=document.querySelectorAll('#xlsPer,#xls7,#xlsTodo');bs.forEach(x=>x.disabled=true);$('xlsMsg').innerHTML='<p class="muted">Preparando el Excel…</p>';
+    try{const n=await descargarExcel(periodo(sel),{area:EJ.area,linea:EJ.linea,maq:EJ.maq});$('xlsMsg').innerHTML=`<p class="muted">✅ Se descargó «${esc(n)}». El historial no se modifica.</p>`}catch(e){console.error(e);$('xlsMsg').innerHTML=`<p class="error">${esc(e.message||String(e))}</p>`}bs.forEach(x=>x.disabled=false)}};
+  go('xlsPer',null);go('xls7',{per:'7d'});go('xlsTodo',{per:'todo'})}
+
+// ===== Reporte ejecutivo en Excel =====
+function cargarScript(src,ok){return ok()?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('No se pudo cargar el generador de Excel. Revisa tu conexión a internet.'));document.head.appendChild(s)})}
+const XC={azul:'FF173F80',azul2:'FF1D4F9C',azulS:'FFE8EFFB',rojo:'FFC8102E',gris:'FFF3F5F8',linea:'FFD9DEE5',blanco:'FFFFFFFF'};
+const XSEM={verde:{f:'FFC6EFCE',t:'FF006100',g:'2E9E5B'},amarillo:{f:'FFFFEB9C',t:'FF9C5700',g:'E0A800'},rojo:{f:'FFFFC7CE',t:'FF9C0006',g:'C8102E'}};
+function semTxt(s){return s?SEM_ICO[s]+' '+SEM_TXT[s]:'N/D'}
+function colL(n){let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
+function fechaX(t){return t?new Date(t-new Date(t).getTimezoneOffset()*60000):null} // ExcelJS guarda la hora como UTC: la ajustamos a hora local
+async function descargarExcel(P,f){
+  await cargarScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',()=>window.ExcelJS);
+  await cargarScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',()=>window.JSZip);
+  const now=Date.now(),D=calcular(P.a,P.b,f,now),T=D.t,pv=previo(P),A=pv?calcular(pv.a,pv.b,f,now).t:null,fin=Math.min(P.b,now);
+  const sem=semanasHasta(fin-1,P.todo?Math.min(52,Math.ceil((fin-P.a)/SEMANA)+1):8,f,now);
+  const wb=new ExcelJS.Workbook();wb.creator='Mantenimiento La Josefina';wb.created=new Date();
+  const graficas=[],resumenes={};let hojaN=0;
+  const hoja=(nombre,anchos,opc)=>{hojaN++;const ws=wb.addWorksheet(nombre,Object.assign({views:[{showGridLines:false}],properties:{defaultRowHeight:18},pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3}}},opc||{}));ws.columns=anchos.map(w=>({width:w}));ws._n=hojaN;return ws};
+  const borde={top:{style:'thin',color:{argb:XC.linea}},left:{style:'thin',color:{argb:XC.linea}},bottom:{style:'thin',color:{argb:XC.linea}},right:{style:'thin',color:{argb:XC.linea}}};
+  const titulo=(ws,t,sub,ncol)=>{ws.mergeCells(1,1,1,ncol);const c=ws.getCell(1,1);c.value=t;c.font={bold:true,size:16,color:{argb:XC.blanco}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azul}};c.alignment={vertical:'middle'};ws.getRow(1).height=30;
+    ws.mergeCells(2,1,2,ncol);const s=ws.getCell(2,1);s.value=sub;s.font={italic:true,color:{argb:'FF55606B'}};ws.getRow(3).height=6};
+  const encab=(ws,r,cols,color,c0)=>{const row=ws.getRow(r);cols.forEach((t,i)=>{const c=row.getCell(i+(c0||1));c.value=t;c.font={bold:true,color:{argb:XC.blanco}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:color||XC.azul2}};c.alignment={vertical:'middle',horizontal:'center',wrapText:true};c.border=borde});row.height=32;return row};
+  const fila=(ws,r,vals,fmts)=>{const row=ws.getRow(r);vals.forEach((v,i)=>{const c=row.getCell(i+1);c.value=v==null?'N/D':v;c.border=borde;c.alignment={vertical:'top',wrapText:true};if(fmts&&fmts[i]&&v!=null&&typeof v!=='string')c.numFmt=fmts[i];if(v==null)c.font={color:{argb:'FF8A939C'},italic:true}});return row};
+  const pintaSem=(c,s)=>{c.value=semTxt(s);if(s){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM[s].f}};c.font={bold:true,color:{argb:XSEM[s].t}}}else c.font={color:{argb:'FF8A939C'},italic:true};c.alignment={horizontal:'center',vertical:'middle'}};
+  const ref=(ws,c1,r1,c2,r2)=>`'${ws.name}'!$${colL(c1)}$${r1}:$${colL(c2)}$${r2}`;
+  const sub=`${P.txt} · ${rangoTxt(P.a,Math.min(P.b,now+1))}${f.area||f.linea||f.maq?' · Filtro: '+[f.area,f.linea,f.maq&&maq(f.maq)?maq(f.maq).nombre:''].filter(Boolean).join(' / '):''} · Generado ${fLarga(now)} ${hhmm(now)} por ${perfil.nombre}`;
+  const H='0.00',M='0.0',PC='0.0%',FE='dd/mm/yyyy',HO='hh:mm';
+  const nomM=m=>m.nombre+' · '+m.planta+' · '+m.zona;
+
+  // 1. Resumen ejecutivo
+  let ws=hoja('Resumen ejecutivo',[44,18,18,16,18,4,30,14,14,16]);titulo(ws,'Reporte ejecutivo de mantenimiento · La Josefina',sub,10);
+  encab(ws,4,['Indicador','Periodo actual','Periodo anterior','Diferencia','Resultado']);
+  const lin=[['Máquinas registradas',D.maqs.length,null,'','n'],['Áreas',D.areas.length,null,'','n'],['Líneas',[].concat(...D.areas.map(a=>a.lineas)).length,null,'','n'],
+    ['Reportes de falla',T.nf,A&&A.nf,'0',-1],['Otros trabajos de mantenimiento (preventivos, etc.)',T.trabajos,A&&A.trabajos,'0','n'],['Reportes que detuvieron la línea',T.paros,A&&A.paros,'0',-1],['Paros reales (veces que se detuvo)',T.veces,A&&A.veces,'0',-1],
+    ['Tiempo de producción perdido por paros (h)',h1(T.perdido),A&&h1(A.perdido),H,-1],['Horas programadas de operación (h)',h1(T.prog),A&&h1(A.prog),H,'n'],
+    ['Tiempo promedio de respuesta (min)',m1(prom(T.resp)),A&&m1(prom(A.resp)),M,-1],['Tiempo promedio de reparación (min)',m1(prom(T.rep)),A&&m1(prom(A.rep)),M,-1],
+    ['Disponibilidad',T.disp,A&&A.disp,PC,1],['Fallas solucionadas (cerradas)',T.nf?T.resueltas/T.nf:null,A&&(A.nf?A.resueltas/A.nf:null),PC,1]];
+  lin.forEach((l,i)=>{const r=5+i,row=fila(ws,r,[l[0],l[1],pv&&l[4]!=='n'?l[2]:'',null,''],[null,l[3],l[3]]);row.getCell(1).font={bold:true};
+    if(pv&&l[4]!=='n'){row.getCell(4).value={formula:`IF(OR(ISTEXT(B${r}),ISTEXT(C${r}),C${r}=""),"",B${r}-C${r})`};row.getCell(4).numFmt=l[3];
+      row.getCell(5).value={formula:`IF(D${r}="","",IF(D${r}=0,"= Igual",IF(D${r}*${l[4]}>0,"✔ Mejoró","✖ Empeoró")))`};row.getCell(5).font={bold:true};row.getCell(4).font={}}else{row.getCell(4).value='';row.getCell(5).value=''}});
+  const rD=5+lin.findIndex(l=>l[0]==='Disponibilidad');ws.getCell(rD,2).font={bold:true,size:12};
+  ws.addConditionalFormatting({ref:'E5:E17',rules:[{type:'containsText',operator:'containsText',text:'Mejoró',style:{font:{color:{argb:'FF006100'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFC6EFCE'}}},priority:1},{type:'containsText',operator:'containsText',text:'Empeoró',style:{font:{color:{argb:'FF9C0006'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFC7CE'}}},priority:2}]});
+  let r=5+lin.length+1;ws.getCell(r,1).value='Semáforo general del periodo';ws.getCell(r,1).font={bold:true};pintaSem(ws.getCell(r,2),T.sem);ws.mergeCells(r,2,r,3);
+  r+=1;ws.getCell(r,1).value=`Verde: pierde menos del ${umbrales().verde}% de las horas programadas · Amarillo: del ${umbrales().verde}% a menos del ${umbrales().rojo}% · Rojo: ${umbrales().rojo}% o más. Meta de disponibilidad: más de 80%.`;ws.mergeCells(r,1,r,5);ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF55606B'}};ws.getCell(r,1).alignment={wrapText:true};ws.getRow(r).height=28;
+  // Top 5 y fallas más frecuentes (a la derecha)
+  encab(ws,4,['Top 5 · mayor tiempo de paro','Horas de paro','Paros','Semáforo'],null,7);
+  const top=D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).slice(0,5);
+  top.forEach((x,i)=>{const row=ws.getRow(5+i);[[7,x.m.nombre+' · '+x.m.zona+' ('+x.m.planta+')'],[8,h1(x.perdido)],[9,x.veces]].forEach(([c,v])=>{const k=row.getCell(c);k.value=v;k.border=borde;if(c===8)k.numFmt=H});pintaSem(row.getCell(10),x.sem);row.getCell(10).border=borde});
+  if(top.length)graficas.push({ws,tipo:'bar',titulo:'Top 5 · horas de paro por máquina',cat:{ref:ref(ws,7,5,7,4+top.length),vals:top.map(x=>x.m.nombre+' · '+x.m.zona)},series:[{nombre:'Horas de paro',ref:ref(ws,8,5,8,4+top.length),vals:top.map(x=>h1(x.perdido)),color:'1D4F9C',colores:top.map(x=>x.sem?XSEM[x.sem].g:'1D4F9C')}],desde:[6,11],hasta:[10,27]});
+  const cau=causas(D);const r0=29;encab(ws,r0,['Fallas más frecuentes (tipo)','Veces','Horas de paro'],null,7);
+  cau.slice(0,8).forEach((c,i)=>{const row=ws.getRow(r0+1+i);[[7,c.tipo],[8,c.n],[9,h1(c.perdido)]].forEach(([k,v])=>{const z=row.getCell(k);z.value=v;z.border=borde;if(k===9)z.numFmt=H})});
+  if(cau.length)graficas.push({ws,tipo:'bar',titulo:'Fallas más frecuentes',cat:{ref:ref(ws,7,r0+1,7,r0+Math.min(8,cau.length)),vals:cau.slice(0,8).map(c=>c.tipo)},series:[{nombre:'Fallas',ref:ref(ws,8,r0+1,8,r0+Math.min(8,cau.length)),vals:cau.slice(0,8).map(c=>c.n),color:'C8102E'}],desde:[0,r0-1],hasta:[5,r0+16]});
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:3}];
+
+  // 2. Resumen por área y línea
+  ws=hoja('Área y línea',[16,22,12,12,13,14,16,16,16,16,22],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Resumen por área y línea',sub,11);
+  encab(ws,4,['Área','Línea','Máquinas','Reportes de falla','Paros reales (veces)','Reportes con paro','Horas programadas','Horas de paro (tiempo perdido)','Resp. promedio (min)','Disponibilidad','Semáforo']);
+  r=5;const areaFilas=[];
+  D.areas.forEach(ar=>{const ra=r;areaFilas.push(ra);const lr=[];r++;ar.lineas.forEach(li=>{lr.push(r);const row=fila(ws,r,['',li.linea,li.maqs.length,li.t.nf,li.t.veces,li.t.paros,h1(li.t.prog),h1(li.t.perdido),m1(prom(li.t.resp)),li.t.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);row.outlineLevel=1;pintaSem(row.getCell(11),li.t.sem);row.getCell(11).border=borde;r++});
+    const row=fila(ws,ra,[ar.area,'Todas',null,null,null,null,h1(ar.t.prog),null,m1(prom(ar.t.resp)),ar.t.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);
+    [3,4,5,6,8].forEach(c=>{row.getCell(c).value={formula:`SUM(${colL(c)}${lr[0]}:${colL(c)}${lr[lr.length-1]})`};row.getCell(c).numFmt=c===8?H:'0';row.getCell(c).font={bold:true}});
+    row.eachCell(c=>{c.fill=c.fill||{type:'pattern',pattern:'solid',fgColor:{argb:XC.azulS}};c.font=Object.assign({},c.font||{},{bold:true})});pintaSem(row.getCell(11),ar.t.sem);row.getCell(11).border=borde;resumenes[ws._n]=(resumenes[ws._n]||[]).concat(ra)});
+  {const row=fila(ws,r,['Total general','',null,null,null,null,h1(T.prog),null,m1(prom(T.resp)),T.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);[3,4,5,6,8].forEach(c=>{row.getCell(c).value={formula:areaFilas.map(x=>colL(c)+x).join('+')||'0'};row.getCell(c).numFmt=c===8?H:'0'});row.eachCell(c=>{c.font={bold:true,color:{argb:XC.blanco}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azul}}});pintaSem(row.getCell(11),T.sem)}
+  const rTot=r;r+=2;ws.getCell(r,1).value='La disponibilidad de cada área y línea se calcula con las horas programadas de sus máquinas (no es el promedio de porcentajes). Las horas de paro sí se suman. Usa los botones 1 y 2 de la izquierda para contraer o expandir las líneas.';ws.mergeCells(r,1,r,11);ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF55606B'}};ws.getCell(r,1).alignment={wrapText:true};ws.getRow(r).height=30;
+  const lineasAll=[].concat(...D.areas.map(ar=>ar.lineas.map(li=>({n:li.linea+' · '+ar.area,t:li.t}))));
+  const rl=r+2;encab(ws,rl,['Línea','Horas de paro']);lineasAll.forEach((x,i)=>{fila(ws,rl+1+i,[x.n,h1(x.t.perdido)],[null,H])});
+  if(lineasAll.length)graficas.push({ws,tipo:'bar',titulo:'Horas de paro por línea',cat:{ref:ref(ws,1,rl+1,1,rl+lineasAll.length),vals:lineasAll.map(x=>x.n)},series:[{nombre:'Horas de paro',ref:ref(ws,2,rl+1,2,rl+lineasAll.length),vals:lineasAll.map(x=>h1(x.t.perdido)),color:'1D4F9C',colores:lineasAll.map(x=>x.t.sem?XSEM[x.t.sem].g:'1D4F9C')}],desde:[3,rl-1],hasta:[10,rl+16]});
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:4}];
+
+  // 3. Desglose por máquina (renglones expandibles)
+  ws=hoja('Desglose por máquina',[30,13,13,30,22,24,18,13,13,13,30,11,34,12,16,14],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Desglose por máquina · toca el botón + de la izquierda para ver cada reporte',sub,16);
+  encab(ws,4,['Máquina','Área','Línea','Horas programadas','Horas de paro','Veces que se detuvo','Reportes levantados','Resp. prom. (min)','Rep. prom. (min)','Disponibilidad','Semáforo','Turnos QR (h)','Reportes con paro','Sin hora de reanudación','Otros trabajos','Fallas cerradas']);
+  r=5;
+  D.maqs.forEach(x=>{const row=fila(ws,r,[nomM(x.m),x.m.planta,x.m.zona,h1(x.prog),h1(x.perdido),x.veces,x.nf,m1(prom(x.resp)),m1(prom(x.rep)),x.disp,'',h1(x.turnoH),x.paros,x.sinFin,x.trabajos,x.resueltas],[null,null,null,H,H,'0','0',M,M,PC,null,H,'0','0','0','0']);
+    row.eachCell(c=>{c.font=Object.assign({},c.font||{},{bold:true});c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azulS}}});pintaSem(row.getCell(11),x.sem);row.getCell(11).border=borde;row.height=22;resumenes[ws._n]=(resumenes[ws._n]||[]).concat(r);r++;
+    const regs=x.regs.slice().sort((p,q)=>msReg(p)-msReg(q));
+    const h=encab(ws,r,['Fecha','Hora del reporte','Tipo','Descripción del problema','Tipo de falla','Causa de la falla','Mecánico que atendió','Respuesta (min)','Reparación (min)','Paro real (min)','Refacciones utilizadas','Cantidad','Trabajo realizado','Hora de solución','¿Línea detenida?','Estado'],'FF5B6B7E');h.outlineLevel=1;h.hidden=true;h.height=30;r++;
+    if(!regs.length){const e=fila(ws,r,['Sin reportes en el periodo']);e.outlineLevel=1;e.hidden=true;r++}
+    regs.forEach(rg=>{const t=tiempos(rg),ip=intParo(rg,now),refs=refsDe(rg),cant=refs.reduce((s,z)=>z.cantidad==null?s:s+(z.cantidad||0),0),sol=ms(rg.finAtencion);
+      const e=fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',esFalla(rg)?(rg.tipoFalla||null):'—',rg.causa||null,rg.atendidoPor||(!esFalla(rg)?rg.tecnico:null)||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),refs.map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad+(z.unidad?' '+z.unidad:''):z.nombre).join(', ')||'—',refs.length?(refs.some(z=>z.cantidad!=null)?cant:null):0,rg.trabajoRealizado||rg.observaciones||(esFalla(rg)?null:'—'),sol?fechaX(sol):(esFalla(rg)?null:'—'),lineaDetenida(rg),rg.estado||''],[FE,HO,null,null,null,null,null,M,M,M,null,'0',null,HO]);
+      e.outlineLevel=1;e.hidden=true;if(ip&&ip[2]==='curso')e.getCell(10).note='Paro en curso: se cuenta hasta la hora de generación del reporte';if(ip&&ip[2]==='prov')e.getCell(10).note='Provisional: falta que la operadora confirme; se usó la hora en que terminó el mecánico';r++})});
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:4,xSplit:1}];
+
+  // 4. Intervenciones (lista completa con filtros)
+  ws=hoja('Intervenciones',[12,8,24,13,11,18,30,22,22,18,12,12,12,12,30,34,12,15,14,18,14],{});titulo(ws,'Intervenciones del periodo (con filtros)',sub,21);
+  const cols=['Fecha','Hora','Máquina','Área','Línea','Tipo','Descripción','Tipo de falla','Causa','Mecánico / responsable','Respuesta (min)','Reparación (min)','Paro real (min)','Paro contado (min)','Refacciones','Trabajo realizado','Hora solución','¿Línea detenida?','Estado','Reportó','Confirmó'];encab(ws,4,cols);
+  const todos=[].concat(...D.maqs.map(x=>x.regs.map(rg=>({x,rg})))).sort((p,q)=>msReg(p.rg)-msReg(q.rg));r=5;
+  todos.forEach(({x,rg})=>{const t=tiempos(rg),ip=intParo(rg,now);let cont=null;if(ip){const a=Math.max(ip[0],P.a),b=Math.min(ip[1],fin);cont=b>a?m1(b-a):0}
+    fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),x.m.nombre+' · '+x.m.zona,x.m.planta,x.m.zona,esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',rg.tipoFalla||'—',rg.causa||null,rg.atendidoPor||rg.tecnico||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),ip?cont:(lineaDetenida(rg)==='Detenida'?null:0),refsDe(rg).map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad:z.nombre).join(', ')||'—',rg.trabajoRealizado||'—',ms(rg.finAtencion)?fechaX(ms(rg.finAtencion)):'—',lineaDetenida(rg),rg.estado||'',esFalla(rg)?rg.tecnico||'':'—',rg.confirmadoPor||'—'],[FE,HO,null,null,null,null,null,null,null,null,M,M,M,M,null,null,HO]);r++});
+  if(todos.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+todos.length,column:cols.length}};else fila(ws,5,['Sin intervenciones en el periodo']);
+  if(todos.length){const rr=r+1;ws.getCell(rr,13).value='Total (min)';ws.getCell(rr,13).font={bold:true};ws.getCell(rr,14).value={formula:`SUBTOTAL(9,N5:N${r-1})`};ws.getCell(rr,14).numFmt=M;ws.getCell(rr,14).font={bold:true}}
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:4}];
+
+  // 5. Mecánicos
+  const mec=mecanicos(D);ws=hoja('Mecánicos',[28,16,18,18,18],{});titulo(ws,'Tiempos de respuesta y reparación por mecánico',sub,5);
+  encab(ws,4,['Mecánico','Intervenciones','Resp. promedio (min)','Reparación promedio (min)','Paros atendidos']);
+  mec.forEach((x,i)=>fila(ws,5+i,[x.nombre,x.n,m1(prom(x.resp)),m1(prom(x.rep)),x.paros],[null,'0',M,M,'0']));
+  if(mec.length){const rr=5+mec.length;const row=fila(ws,rr,['Total / promedio general',{formula:`SUM(B5:B${rr-1})`},m1(prom(T.resp)),m1(prom(T.rep)),{formula:`SUM(E5:E${rr-1})`}],[null,'0',M,M,'0']);row.eachCell(c=>c.font={bold:true});
+    graficas.push({ws,tipo:'bar',titulo:'Intervenciones por mecánico',cat:{ref:ref(ws,1,5,1,4+mec.length),vals:mec.map(x=>x.nombre)},series:[{nombre:'Intervenciones',ref:ref(ws,2,5,2,4+mec.length),vals:mec.map(x=>x.n),color:'1D4F9C'}],desde:[0,rr+1],hasta:[4,rr+18]})}else fila(ws,5,['Sin intervenciones en el periodo']);
+
+  // 6. Fallas repetitivas
+  const rep=repetitivas(D);ws=hoja('Fallas repetitivas',[30,14,12,28,14,16,30,40],{});titulo(ws,'Fallas repetitivas (mismo tipo de falla en la misma máquina, 2 veces o más)',sub,8);
+  encab(ws,4,['Máquina','Área','Línea','Tipo de falla','Repeticiones','Tiempo perdido (h)','Mecánicos','Refacciones utilizadas']);
+  rep.forEach((o,i)=>{const row=fila(ws,5+i,[o.m.nombre+' · '+o.m.zona,o.m.planta,o.m.zona,o.tipo,o.n,h1(o.perdido),o.mecTxt,o.refTxt],[null,null,null,null,'0',H]);const s=o.n>=3?'rojo':'amarillo';row.getCell(5).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM[s].f}};row.getCell(5).font={bold:true,color:{argb:XSEM[s].t}}});
+  if(rep.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+rep.length,column:8}};else fila(ws,5,['No hay fallas repetitivas en el periodo']);
+
+  // 7. Refacciones
+  ws=hoja('Refacciones',[30,14,12,10,30,14,12,12,24,16,16],{});titulo(ws,'Refacciones utilizadas en el periodo',sub,11);
+  encab(ws,4,['Refacción','Código','Cantidad','Unidad','Máquina','Área','Línea','Fecha','Mecánico responsable','Costo unitario','Costo total']);r=5;
+  todos.forEach(({x,rg})=>refsDe(rg).forEach(z=>{const inv=z.id&&REF.find(y=>y.id===z.id),cu=inv&&Number(inv.costo)>0?Number(inv.costo):null;
+    const row=fila(ws,r,[z.nombre,z.codigo||'',z.cantidad,z.unidad||'',x.m.nombre+' · '+x.m.zona,x.m.planta,x.m.zona,fechaX(msReg(rg)),rg.atendidoPor||rg.tecnico||'',cu==null?'':cu,''],[null,null,'0.##',null,null,null,null,FE,null,'"$"#,##0.00']);
+    row.getCell(11).value={formula:`IF(OR(J${r}="",ISTEXT(C${r})),"",C${r}*J${r})`};row.getCell(11).numFmt='"$"#,##0.00';r++}));
+  if(r>5){ws.autoFilter={from:{row:4,column:1},to:{row:r-1,column:11}};const row=ws.getRow(r+1);row.getCell(10).value='Costo total';row.getCell(10).font={bold:true};row.getCell(11).value={formula:`SUBTOTAL(9,K5:K${r-1})`};row.getCell(11).numFmt='"$"#,##0.00';row.getCell(11).font={bold:true};
+    ws.getCell(r+3,1).value='Escribe el costo unitario en la columna J (o regístralo en el inventario de la plataforma) y el costo total se calcula solo.';ws.getCell(r+3,1).font={italic:true,size:9,color:{argb:'FF55606B'}}}else fila(ws,5,['Sin refacciones registradas en el periodo']);
+
+  // 8. Comparación semanal
+  ws=hoja('Comparación semanal',[26,16,12,14,16,18,18],{});titulo(ws,'Evolución y comparación semanal',sub,7);
+  encab(ws,4,['Semana (lunes a domingo)','Horas de paro','Fallas','Paros reales','Disponibilidad','Resp. promedio (min)','Contra la semana anterior']);
+  sem.forEach((s,i)=>{const rr=5+i;const row=fila(ws,rr,[fCorta(s.a)+' – '+fCorta(s.b-1)+' '+new Date(s.b-1).getFullYear(),h1(s.t.perdido)||0,s.t.nf,s.t.veces,s.t.disp,m1(prom(s.t.resp)),i?null:'—'],[null,H,'0','0',PC,M]);
+    if(i){row.getCell(7).value={formula:`IF(B${rr}<B${rr-1},"✔ Mejoró (menos paro)",IF(B${rr}>B${rr-1},"✖ Empeoró (más paro)","= Igual"))`};row.getCell(7).font={bold:true}}});
+  if(sem.length){ws.addConditionalFormatting({ref:`G5:G${4+sem.length}`,rules:[{type:'containsText',operator:'containsText',text:'Mejoró',style:{font:{color:{argb:'FF006100'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFC6EFCE'}}},priority:1},{type:'containsText',operator:'containsText',text:'Empeoró',style:{font:{color:{argb:'FF9C0006'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFC7CE'}}},priority:2}]});
+    const e=4+sem.length,cats=sem.map(s=>fCorta(s.a));
+    graficas.push({ws,tipo:'line',titulo:'Horas de paro por semana',cat:{ref:ref(ws,1,5,1,e),vals:sem.map(s=>fCorta(s.a)+' – '+fCorta(s.b-1)+' '+new Date(s.b-1).getFullYear())},series:[{nombre:'Horas de paro',ref:ref(ws,2,5,2,e),vals:sem.map(s=>h1(s.t.perdido)||0),color:'C8102E'}],desde:[0,e+1],hasta:[4,e+19]});
+    graficas.push({ws,tipo:'col',titulo:'Fallas y paros por semana',cat:{ref:ref(ws,1,5,1,e),vals:sem.map(s=>fCorta(s.a)+' – '+fCorta(s.b-1)+' '+new Date(s.b-1).getFullYear())},series:[{nombre:'Fallas',ref:ref(ws,3,5,3,e),vals:sem.map(s=>s.t.nf),color:'1D4F9C'},{nombre:'Paros reales',ref:ref(ws,4,5,4,e),vals:sem.map(s=>s.t.veces),color:'C8102E'}],desde:[4,e+1],hasta:[7,e+19]})}
+
+  // 9. Turnos registrados con QR
+  ws=hoja('Turnos (QR)',[12,30,12,12,24,16,10,10,10,28,40],{});titulo(ws,'Turnos registrados con el código QR (evidencia de operación)',sub,11);
+  encab(ws,4,['Fecha','Máquina','Área','Línea','Operadora','Turno','Inicio','Fin','Horas','Cierre','Correcciones']);
+  const ids=new Set(D.maqs.map(x=>x.m.id)),tur=TURNOS.filter(t=>ids.has(t.equipo)&&ms(t.inicio)>=P.a&&ms(t.inicio)<P.b).sort((p,q)=>ms(p.inicio)-ms(q.inicio));
+  tur.forEach((t,i)=>{const m=maq(t.equipo)||{nombre:t.equipo,zona:t.linea||'',planta:t.planta||''},a=ms(t.inicio),b=ms(t.fin);fila(ws,5+i,[fechaX(a),m.nombre+' · '+m.zona,m.planta,m.zona,t.operador||'',t.turno||'',fechaX(a),b?fechaX(b):(t.estado==='Abierto'?'En curso':null),b?h1(b-a):null,t.estado==='Abierto'?'Abierto':(t.cierre||'Operadora'),(t.historial||[]).map(hh=>new Date(hh.en).toLocaleString('es-MX')+' · '+hh.por+': '+hh.motivo).join(' | ')||'—'],[FE,null,null,null,null,null,HO,HO,H])});
+  if(tur.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+tur.length,column:11}};else fila(ws,5,['Sin turnos registrados en el periodo']);
+  ws.getCell(6+tur.length,1).value='Los turnos con QR son evidencia; la disponibilidad se calcula con el horario programado de cada máquina para que olvidar iniciar o finalizar un turno no altere los indicadores.';ws.getCell(6+tur.length,1).font={italic:true,size:9,color:{argb:'FF55606B'}};
+
+  // 10. Notas
+  ws=hoja('Notas',[34,90],{});titulo(ws,'Cómo se calcula cada indicador',sub,2);
+  [['Tiempo de respuesta','Desde que la operadora reporta la falla (o la reabre) hasta que el mecánico escanea el QR o toca «Atender».'],['Tiempo de reparación','Desde que el mecánico empieza hasta que registra que terminó.'],['Tiempo de paro','Desde el reporte de una falla con «línea detenida» hasta que la operadora confirma ✅ que volvió a producir (o, si nadie confirma en 4 h, la hora en que terminó el mecánico).'],
+   ['Paros simultáneos','Si una máquina tiene varios reportes con paro al mismo tiempo, los minutos se cuentan una sola vez. «Veces que se detuvo» cuenta los paros reales; «Reportes con paro» cuenta los reportes.'],['Fallas sin paro','Cuentan como reporte de mantenimiento, pero no suman tiempo perdido de producción.'],
+   ['Horas programadas','Salen del horario configurado de cada máquina (días y turnos). Solo cuentan las horas transcurridas hasta el momento de la descarga. Para fechas anteriores al primer horario guardado se usa ese primer horario.'],['Tiempo perdido','Horas de paro dentro del horario programado. Si la máquina no tiene horario, se cuenta todo el paro y su disponibilidad aparece como N/D.'],
+   ['Disponibilidad','(Horas programadas − horas de paro dentro del horario) ÷ horas programadas. En áreas y líneas se suman las horas de sus máquinas; no se promedian porcentajes.'],['Semáforo',`Verde: pierde menos del ${umbrales().verde}% · Amarillo: del ${umbrales().verde}% a menos del ${umbrales().rojo}% · Rojo: ${umbrales().rojo}% o más (configurable por el administrador).`],
+   ['Comparación','Se compara contra el periodo anterior de la misma duración (por ejemplo, esta semana hasta hoy contra los mismos días de la semana pasada).'],['N/D','Dato no disponible: el registro no tiene la información necesaria. No se inventan datos.'],['Historial','Descargar el reporte no borra ni modifica ningún registro de la plataforma.']].forEach((l,i)=>{const row=fila(ws,4+i,l);row.getCell(1).font={bold:true};row.height=34});
+
+  let buf=await wb.xlsx.writeBuffer();buf=await agregarGraficas(buf,graficas,resumenes);
+  const nombre=`Mantenimiento La Josefina ${P.todo?'historial completo':iso(new Date(P.a))+' a '+iso(new Date(Math.min(P.b,now+1)-1))}.xlsx`;
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nombre;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},4000);
+  return nombre}
+// Gráficas nativas de Excel (ExcelJS no las genera): se agregan al archivo como DrawingML
+function xe(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function chartXml(g){const bar=g.tipo!=='line',hor=g.tipo==='bar',multi=g.series.length>1;
+  const ser=g.series.map((s,i)=>`<c:ser><c:idx val="${i}"/><c:order val="${i}"/><c:tx><c:v>${xe(s.nombre)}</c:v></c:tx><c:spPr>${bar?`<a:solidFill><a:srgbClr val="${s.color}"/></a:solidFill>`:`<a:ln w="31750" cap="rnd"><a:solidFill><a:srgbClr val="${s.color}"/></a:solidFill><a:round/></a:ln>`}</c:spPr>${bar?'<c:invertIfNegative val="0"/>':`<c:marker><c:symbol val="circle"/><c:size val="7"/><c:spPr><a:solidFill><a:srgbClr val="${s.color}"/></a:solidFill></c:spPr></c:marker>`}${(s.colores||[]).map((c,j)=>`<c:dPt><c:idx val="${j}"/>${bar?'<c:invertIfNegative val="0"/>':''}<c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="${c}"/></a:solidFill></c:spPr></c:dPt>`).join('')}<c:dLbls><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900" b="1"/></a:pPr><a:endParaRPr lang="es-MX"/></a:p></c:txPr>${bar?'<c:dLblPos val="outEnd"/>':'<c:dLblPos val="t"/>'}<c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls><c:cat><c:strRef><c:f>${xe(g.cat.ref)}</c:f><c:strCache><c:ptCount val="${g.cat.vals.length}"/>${g.cat.vals.map((v,j)=>`<c:pt idx="${j}"><c:v>${xe(v)}</c:v></c:pt>`).join('')}</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:f>${xe(s.ref)}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${s.vals.length}"/>${s.vals.map((v,j)=>v==null||isNaN(v)?'':`<c:pt idx="${j}"><c:v>${v}</c:v></c:pt>`).join('')}</c:numCache></c:numRef></c:val>${bar?'':'<c:smooth val="0"/>'}</c:ser>`).join('');
+  const ejes=`<c:axId val="50010"/><c:axId val="50020"/>`;
+  const plot=bar?`<c:barChart><c:barDir val="${hor?'bar':'col'}"/><c:grouping val="clustered"/><c:varyColors val="0"/>${ser}<c:gapWidth val="60"/>${ejes}</c:barChart>`:`<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${ser}<c:marker val="1"/>${ejes}</c:lineChart>`;
+  const txt=`<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:endParaRPr lang="es-MX"/></a:p></c:txPr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="es-MX" sz="1200" b="1"/><a:t>${xe(g.titulo)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>${plot}
+<c:catAx><c:axId val="50010"/><c:scaling><c:orientation val="${hor?'maxMin':'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${hor?'l':'b'}"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${txt}<c:crossAx val="50020"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>
+<c:valAx><c:axId val="50020"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="${hor?1:0}"/><c:axPos val="${hor?'t':'l'}"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="E3E7EC"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${txt}<c:crossAx val="50010"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>${multi?'<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>':''}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="D9DEE5"/></a:solidFill></a:ln></c:spPr></c:chartSpace>`}
+async function agregarGraficas(buf,graficas,resumenes){const zip=await JSZip.loadAsync(buf);
+  // Renglones de resumen marcados como «contraídos» para que Excel muestre el botón +
+  for(const [n,filas] of Object.entries(resumenes||{})){const p=`xl/worksheets/sheet${n}.xml`;let x=await zip.file(p).async('string');filas.forEach(r=>{x=x.replace(new RegExp(`<row r="${r}"(?![^>]*collapsed)`),`<row r="${r}" collapsed="1"`)});x=x.replace(/(<row [^>]*outlineLevel="1"[^>]*?) collapsed="1"/g,'$1');zip.file(p,x)}
+  if(!graficas.length)return zip.generateAsync({type:'arraybuffer'});
+  let ct=await zip.file('[Content_Types].xml').async('string');const porHoja={};graficas.forEach(g=>{(porHoja[g.ws._n]=porHoja[g.ws._n]||[]).push(g)});let nc=0,nd=0;
+  for(const [n,lista] of Object.entries(porHoja)){nd++;const anclas=[],drels=[];
+    lista.forEach((g,i)=>{nc++;zip.file(`xl/charts/chart${nc}.xml`,chartXml(g));ct=ct.replace('</Types>',`<Override PartName="/xl/charts/chart${nc}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>`);
+      drels.push(`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${nc}.xml"/>`);
+      anclas.push(`<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${g.desde[0]}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${g.desde[1]}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${g.hasta[0]}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${g.hasta[1]}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${i+2}" name="Gráfica ${i+1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId${i+1}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`)});
+    zip.file(`xl/drawings/drawing${nd}.xml`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anclas.join('')}</xdr:wsDr>`);
+    zip.file(`xl/drawings/_rels/drawing${nd}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${drels.join('')}</Relationships>`);
+    ct=ct.replace('</Types>',`<Override PartName="/xl/drawings/drawing${nd}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
+    const sp=`xl/worksheets/sheet${n}.xml`,rp=`xl/worksheets/_rels/sheet${n}.xml.rels`;let sx=await zip.file(sp).async('string');
+    let rx=zip.file(rp)?await zip.file(rp).async('string'):'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    rx=rx.replace('</Relationships>',`<Relationship Id="rIdGraf${nd}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${nd}.xml"/></Relationships>`);zip.file(rp,rx);
+    if(!/xmlns:r=/.test(sx.slice(0,800)))sx=sx.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+    const tag=`<drawing r:id="rIdGraf${nd}"/>`,m=sx.match(/<(legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b|<\/worksheet>/);sx=sx.slice(0,m.index)+tag+sx.slice(m.index);zip.file(sp,sx)}
+  zip.file('[Content_Types].xml',ct);return zip.generateAsync({type:'arraybuffer',compression:'DEFLATE'})}
+
+// ===== Turnos con QR =====
+function puedeTurno(){return activoP()&&['Operador',PRINCIPAL].includes(perfil.rol)}
+function verTurnos(){return activoP()&&[PRINCIPAL,'Supervisor de mantenimiento','Dirección','Gerencia','Coordinación'].includes(perfil.rol)}
+function miTurnoAbierto(){return usuario?TURNOS.find(t=>t.operadorUid===usuario.uid&&t.estado==='Abierto'):null}
+function txtTurno(t){return t?`${esc(t.nombre)} (${hhmm(t.a)}–${hhmm(t.b)})`:'Fuera del horario programado'}
+function tarjetaTurno(){if(!puedeTurno())return '';const ab=miTurnoAbierto();const eq=maqFija||(misLineas()&&misLineas().length===1?misLineas()[0]:null);
+  if(ab){const m=maq(ab.equipo)||{zona:ab.equipo,planta:''};return `<div class="card turno abierto"><p style="margin:0 0 8px"><b>🟢 Turno en curso</b> · ${esc(m.planta+' · '+m.zona)} · ${esc(ab.turno||'')} desde las ${hhmm(ms(ab.inicio))}</p>${eq&&eq!==ab.equipo?'<p class="muted" style="margin:0 0 8px">Para iniciar turno en otra máquina, primero finaliza este.</p>':''}<button class="xl sec" id="finTurno" data-id="${esc(ab.id)}">⏹ FINALIZAR TURNO</button></div>`}
+  if(!eq)return '';const m=maq(eq),t=turnoEn(eq,Date.now());
+  return `<div class="card turno"><p style="margin:0 0 8px"><b>${esc(m.nombre)} · ${esc(m.zona)}</b><br><small class="muted">${horario(eq)?txtTurno(t):'Esta máquina aún no tiene horario configurado'}</small></p><button class="xl" id="iniTurno" data-eq="${esc(eq)}">▶ INICIAR TURNO</button></div>`}
+async function iniciarTurno(eq){const m=maq(eq),now=Date.now(),t=turnoEn(eq,now),nombre=t?t.nombre:'Fuera de horario',fecha=t?iso(new Date(t.a)):hoy();
+  const id=[usuario.uid,eq,fecha,nombre].join('_').replace(/[^\w-]/g,'-');
+  if(TURNOS.some(x=>x.id===id))throw new Error('Ya registraste el '+nombre.toLowerCase()+' de hoy en esta máquina. Si fue un error, pide al supervisor que lo corrija.');
+  try{await db.collection('turnos').doc(id).set({equipo:eq,planta:m.planta,linea:m.zona,operadorUid:usuario.uid,operador:perfil.nombre,fecha,turno:nombre,inicio:TS(),finProgramadoMs:t?t.b:now+HORAS_TURNO*3600000,estado:'Abierto',historial:[]})}
+  catch(e){if(e&&e.code==='permission-denied')throw new Error('Ese turno ya está registrado. Si fue un error, pide al supervisor que lo corrija.');throw e}}
+function listaTurnosMaq(id){const l=TURNOS.filter(t=>t.equipo===id).sort((a,b)=>(ms(b.inicio)||0)-(ms(a.inicio)||0)).slice(0,20);
+  return l.length?`<div class="scroll"><table><thead><tr><th>Fecha</th><th>Operadora</th><th>Turno</th><th>Inicio</th><th>Fin</th><th></th></tr></thead><tbody>${l.map(t=>`<tr><td>${fmt(t.fecha)}</td><td>${esc(t.operador)}</td><td>${esc(t.turno)}</td><td class="num">${hhmm(ms(t.inicio))}</td><td class="num">${t.estado==='Abierto'?'<span class="tag warn">En curso</span>':hhmm(ms(t.fin))}${t.cierre&&t.cierre!=='Operadora'?`<br><small class="muted">${esc(t.cierre)}</small>`:''}${(t.historial||[]).length?`<br><small class="muted">Corregido ${(t.historial||[]).length} vez/veces</small>`:''}</td><td><button class="mini sec" data-corturno="${esc(t.id)}">Corregir</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Todavía no hay turnos registrados con QR en esta máquina.</p>'}
+let corrTurno=null;
+function dtLocal(t){if(!t)return '';const d=new Date(t-new Date(t).getTimezoneOffset()*60000);return d.toISOString().slice(0,16)}
+function formCorrTurno(){const t=corrTurno==='nuevo'?null:TURNOS.find(x=>x.id===corrTurno);if(corrTurno!=='nuevo'&&!t)return '';
+  return `<form id="fTurno" class="card" style="background:var(--accent-soft)"><h3 style="margin-top:0">${t?'Corregir turno de '+esc(t.operador):'Registrar turno que no se capturó'}</h3>
+  ${t?'':`<div class="dos"><div><label for="t_op">Operadora</label><input id="t_op" required maxlength="120"></div><div><label for="t_nom">Turno</label><select id="t_nom">${(horario(maqSel)||{turnos:TURNOS_SUG}).turnos.map(x=>`<option>${esc(x.nombre)}</option>`).join('')}<option>Fuera de horario</option></select></div></div>`}
+  <div class="dos"><div><label for="t_ini">Inicio</label><input id="t_ini" type="datetime-local" required value="${t?dtLocal(ms(t.inicio)):''}"></div><div><label for="t_fin">Fin</label><input id="t_fin" type="datetime-local" value="${t?dtLocal(ms(t.fin)):''}"></div></div>
+  <label for="t_mot">Motivo de la corrección (queda en el historial)</label><input id="t_mot" required maxlength="200" placeholder="Ej. La operadora olvidó finalizar el turno">
+  <div class="acciones"><button type="submit">Guardar corrección</button><button type="button" class="sec" id="cancelTurno">Cancelar</button></div><div id="tErr"></div></form>`}
+function formHorario(id){const h=horario(id),dias=h?h.dias.map(Number):[1,2,3,4,5,6],tur=h?h.turnos:[];
+  return `<div class="card"><h2>Horario programado de operación</h2><p class="muted">Con este horario se calculan las horas programadas y la disponibilidad. Los días y turnos que la máquina no trabaja no cuentan en contra.${h?'':' <b>Aún no hay horario guardado:</b> la disponibilidad aparece como N/D.'}</p>
+  <form id="fHor"><label>Días que trabaja</label><div class="opciones">${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" name="h_dia" value="${d}" ${dias.includes(d)?'checked':''}> ${DIAS_TXT[d]}</label>`).join('')}</div>
+  <label>Turnos</label>${[0,1,2].map(i=>{const t=tur[i]||TURNOS_SUG[i],on=h?!!tur[i]:i===0;return `<div class="filaTurno"><label class="chk"><input type="checkbox" class="h_on" ${on?'checked':''}> Turno ${i+1}</label><input type="time" class="h_ini" value="${esc(t.inicio)}" aria-label="Inicio turno ${i+1}"><span>a</span><input type="time" class="h_fin" value="${esc(t.fin)}" aria-label="Fin turno ${i+1}"></div>`}).join('')}
+  <div class="acciones"><button type="submit">Guardar horario</button></div><div id="hErr"></div></form></div>`}
+function formUmbrales(){const u=umbrales();return `<div class="card"><h2>Semáforo de desempeño (todas las máquinas)</h2><p class="muted">Porcentaje de horas programadas perdidas por paros en el periodo.</p><form id="fUmb" class="dos"><div><label for="u_v">🟢 Verde si pierde menos de (%)</label><input id="u_v" type="number" min="1" max="98" step="0.5" value="${u.verde}"></div><div><label for="u_r">🔴 Rojo desde (%)</label><input id="u_r" type="number" min="2" max="99" step="0.5" value="${u.rojo}"></div><div style="grid-column:1/-1"><small class="muted">Entre ambos valores, 🟡 amarillo. Actual: verde = disponibilidad mayor a ${100-u.verde}%, rojo = ${100-u.rojo}% o menos.</small></div><div><button type="submit">Guardar semáforo</button></div></form></div>`}
+function enlazarTurnos(){
+  const it=$('iniTurno');if(it)it.onclick=async()=>{it.disabled=true;try{await iniciarTurno(it.dataset.eq);toast('🟢 Turno iniciado.')}catch(e){toast(e.message||errTxt(e));it.disabled=false}};
+  const ft=$('finTurno');if(ft)ft.onclick=async()=>{ft.disabled=true;try{await db.collection('turnos').doc(ft.dataset.id).update({estado:'Cerrado',fin:TS(),cierre:'Operadora'});toast('⏹ Turno finalizado. ¡Buen trabajo!')}catch(e){toast(errTxt(e));ft.disabled=false}};
+  const fh=$('fHor');if(fh)fh.onsubmit=async ev=>{ev.preventDefault();const dias=[...fh.querySelectorAll('[name=h_dia]:checked')].map(x=>Number(x.value)),turnos=[];
+    fh.querySelectorAll('.filaTurno').forEach((rw,i)=>{if(rw.querySelector('.h_on').checked)turnos.push({nombre:'Turno '+(i+1),inicio:rw.querySelector('.h_ini').value,fin:rw.querySelector('.h_fin').value})});
+    if(!dias.length||!turnos.length||turnos.some(t=>!t.inicio||!t.fin||t.inicio===t.fin)){$('hErr').innerHTML='<p class="error">Elige al menos un día y un turno con hora de inicio y fin distintas.</p>';return}
+    const prev=horarios(maqSel).map(h=>({desde:h.desde||0,dias:h.dias,turnos:h.turnos,por:h.por||''}));const desde=prev.length?inicioDia(Date.now()):0;
+    const lista=prev.filter(h=>h.desde<desde).concat([{desde,dias,turnos,por:perfil.nombre,guardado:Date.now()}]);
+    try{await db.collection('maquinas').doc(maqSel).set({horarios:lista},{merge:true});toast('Horario guardado.');render(true)}catch(e){$('hErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
+  const fu=$('fUmb');if(fu)fu.onsubmit=async ev=>{ev.preventDefault();const v=Number($('u_v').value),r=Number($('u_r').value);if(!(v>0&&r>v&&r<100)){toast('El valor rojo debe ser mayor que el verde.');return}
+    try{await db.collection('config').doc('indicadores').set({verde:v,rojo:r,por:perfil.nombre,actualizado:TS()},{merge:true});toast('Semáforo guardado.');render(true)}catch(e){toast(errTxt(e))}};
+  document.querySelectorAll('[data-corturno]').forEach(b=>b.onclick=()=>{corrTurno=b.dataset.corturno;render(true)});
+  const nt=$('nuevoTurno');if(nt)nt.onclick=()=>{corrTurno='nuevo';render(true)};
+  const ct=$('cancelTurno');if(ct)ct.onclick=()=>{corrTurno=null;render(true)};
+  const ftu=$('fTurno');if(ftu)ftu.onsubmit=async ev=>{ev.preventDefault();const ini=$('t_ini').value?new Date($('t_ini').value):null,fi=$('t_fin').value?new Date($('t_fin').value):null,mot=$('t_mot').value.trim();
+    if(!ini||(fi&&fi<=ini)){$('tErr').innerHTML='<p class="error">Revisa las horas: el fin debe ser después del inicio.</p>';return}
+    const ent={por:perfil.nombre,uid:usuario.uid,en:Date.now(),motivo:mot};
+    try{if(corrTurno==='nuevo'){const m=maq(maqSel);await db.collection('turnos').doc().set({equipo:maqSel,planta:m.planta,linea:m.zona,operadorUid:'',operador:$('t_op').value.trim(),fecha:iso(ini),turno:$('t_nom').value,inicio:ini,fin:fi||null,finProgramadoMs:fi?fi.getTime():ini.getTime()+HORAS_TURNO*3600000,estado:fi?'Cerrado':'Abierto',cierre:'Capturado por '+perfil.nombre,historial:[Object.assign(ent,{accion:'Alta manual'})]})}
+      else{const t=TURNOS.find(x=>x.id===corrTurno);ent.antes={inicio:ms(t.inicio)||null,fin:ms(t.fin)||null};ent.despues={inicio:ini.getTime(),fin:fi?fi.getTime():null};
+        await db.collection('turnos').doc(t.id).update({inicio:ini,fin:fi||null,estado:fi?'Cerrado':'Abierto',cierre:fi?'Corregido por '+perfil.nombre:(t.cierre||''),historial:(t.historial||[]).concat([ent])})}
+      corrTurno=null;toast('Corrección guardada en el historial.');render(true)}catch(e){$('tErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}}}
+
 function enlazar(){
+  enlazarEjecutivo();enlazarTurnos();
   const f=$('form');
   if(f)f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]');b.disabled=true;$('fErr').innerHTML='';
     const adm=esAdmin(),est=$('m_est').value;
     const d={equipo:$('m_maq').value,tipo:$('m_tipo').value,actividad:$('m_act').value.trim(),refacciones:$('m_ref').value.trim(),minutos:num($('m_min').value),estado:est,observaciones:$('m_obs').value.trim()};
     try{
       if(editId){const ed=REG.find(r=>r.id===editId);Object.assign(d,{fecha:$('m_fecha').value,tecnico:$('m_tec').value.trim(),editadoPor:perfil.nombre,editadoEn:TS()});
-        if($('m_tf'))Object.assign(d,{tipoFalla:$('m_tf').value,trabajoRealizado:$('m_trab').value.trim(),ajustes:$('m_aj').value.trim()});
+        if($('m_tf'))Object.assign(d,{tipoFalla:$('m_tf').value,causa:$('m_causa').value.trim(),trabajoRealizado:$('m_trab').value.trim(),ajustes:$('m_aj').value.trim()});
         if(CERRADOS.includes(est)&&!ed.fechaCierre)d.fechaCierre=hoy();
         await db.collection('registros').doc(editId).update(d);toast('Cambios guardados.');ir('trabajos');return}
       Object.assign(d,{fecha:adm?$('m_fecha').value:hoy(),hora:horaAhora(),tecnico:adm?$('m_tec').value.trim():perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,creadoEn:TS()});
@@ -985,7 +1361,7 @@ function enlazar(){
   if(fz)fz.onsubmit=async ev=>{ev.preventDefault();const b=fz.querySelector('button[type=submit]');b.disabled=true;b.textContent='Guardando…';$('zErr').innerHTML='';const id=fz.dataset.id,r=REG.find(x=>x.id===id);
     const usadas=leerRefs(fz),fl=faltante(usadas);if(fl){$('zErr').innerHTML=`<p class="error">${esc(fl)}</p>`;b.disabled=false;b.textContent='Guardar y finalizar';return}
     try{const fotos=await subirFotos($('z_fotos'),id);const ini=ms(r&&r.inicioAtencion);
-      await db.collection('registros').doc(id).update({estado:POR_CONFIRMAR,finAtencion:TS(),trabajoRealizado:$('z_trab').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:textoRefs(usadas,$('z_ref').value.trim()),refaccionesUsadas:usadas,fotosCierre:fotos,minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
+      await db.collection('registros').doc(id).update({estado:POR_CONFIRMAR,finAtencion:TS(),trabajoRealizado:$('z_trab').value.trim(),causa:$('z_causa').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:textoRefs(usadas,$('z_ref').value.trim()),refaccionesUsadas:usadas,fotosCierre:fotos,minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
       try{await descontarRefs(usadas,id,r&&r.equipo)}catch(er){toast('Trabajo guardado, pero no se pudo descontar el inventario: '+errTxt(er))}
       finalizando=null;toast('✅ Trabajo finalizado. La operadora confirmará que la máquina quedó bien.');render(true)}
     catch(e){$('zErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false;b.textContent='Guardar y finalizar'}};
@@ -1003,7 +1379,7 @@ function enlazar(){
   const ib=$('inv_buscar');if(ib)ib.oninput=()=>{invFiltro=ib.value;clearTimeout(ib._t);ib._t=setTimeout(()=>{render(true);const n=$('inv_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const ai=$('archivoInv');if(ai)ai.onchange=async()=>{const fl=ai.files[0];if(!fl)return;try{await leerArchivoInv(fl)}catch(e){toast(e.message||errTxt(e))}};
   const fr2=$('fRef');if(fr2)fr2.onsubmit=async ev=>{ev.preventDefault();const b=fr2.querySelector('button[type=submit]');b.disabled=true;$('rErr2').innerHTML='';const id=fr2.dataset.id;
-    const d={codigo:$('r_cod').value.trim(),nombre:$('r_nom').value.trim(),unidad:$('r_uni').value.trim()||'pza',ubicacion:$('r_ubi').value.trim(),minimo:Number($('r_min').value)||0,actualizado:TS()};
+    const d={codigo:$('r_cod').value.trim(),nombre:$('r_nom').value.trim(),unidad:$('r_uni').value.trim()||'pza',ubicacion:$('r_ubi').value.trim(),minimo:Number($('r_min').value)||0,actualizado:TS()};if($('r_cos'))d.costo=$('r_cos').value===''?null:Number($('r_cos').value)||0;
     try{if(!id){d.existencia=Number($('r_exi').value)||0;const ref=db.collection('refacciones').doc();await ref.set(d);await db.collection('movimientos').doc().set({refaccion:ref.id,codigo:d.codigo,nombre:d.nombre,tipo:'Alta',cantidad:d.existencia,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()})}
       else{const ent=Number($('r_ent').value)||0,aju=$('r_aju').value;const x=REF.find(y=>y.id===id);
         if(aju!=='')d.existencia=Number(aju);else if(ent>0)d.existencia=fb.firestore.FieldValue.increment(ent);

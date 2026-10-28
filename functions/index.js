@@ -4,7 +4,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions, logger } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const { getMessaging } = require('firebase-admin/messaging');
 
@@ -150,6 +150,19 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
     const out = await avisar(r, d.id, n + 1);
     logger.info('Aviso repetido', d.id, n + 1, out);
   }
+  // Turnos con QR que nadie finalizó: se cierran a la hora programada de fin (solo es evidencia, no cambia indicadores)
+  try {
+    const tu = await db.collection('turnos').where('estado', '==', 'Abierto').get();
+    for (const d of tu.docs) {
+      const t = d.data();
+      const ini = t.inicio && t.inicio.toMillis ? t.inicio.toMillis() : 0;
+      const fp = Number(t.finProgramadoMs) || (ini ? ini + 8 * 3600000 : 0);
+      if (fp && ahora > fp + 2 * 3600000) {
+        await d.ref.update({ estado: 'Cerrado', fin: Timestamp.fromMillis(Math.max(fp, ini + 60000)), cierre: 'Automático: no se finalizó' });
+        logger.info('Turno cerrado automáticamente', d.id);
+      }
+    }
+  } catch (e) { logger.error('Turnos', e); }
 });
 
 // 1c) Falla reabierta por la operadora (❌ sigue fallando) → aviso inmediato a los mecánicos

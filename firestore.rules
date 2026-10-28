@@ -64,7 +64,7 @@ service cloud.firestore {
             && resource.data.atendidoUid == request.auth.uid
             && request.resource.data.estado in ['Por confirmar', 'Cerrada']
             && request.resource.data.finAtencion == request.time
-            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos']))
+            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos', 'causa']))
         // La operadora (o ingeniero de procesos) confirma: ✅ quedó bien / ❌ sigue fallando
         || (activo() && rol() in ['Operador', 'Ingeniero de procesos'] && resource.data.tipo == 'Reporte de falla'
             && resource.data.estado == 'Por confirmar'
@@ -108,6 +108,37 @@ service cloud.firestore {
       allow read: if activo();
       allow create: if (gestor() || mecanico()) && request.resource.data.uid == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    // Ajustes de indicadores (semáforo): todos los leen, el administrador los cambia
+    match /config/{id} {
+      allow read: if activo();
+      allow write: if gestor();
+    }
+
+    // Turnos con QR: la operadora inicia y finaliza el suyo; las correcciones dejan historial
+    match /turnos/{id} {
+      allow read: if activo() && (resource.data.operadorUid == request.auth.uid
+        || rol() in ['Administrador principal', 'Supervisor de mantenimiento', 'Dirección', 'Gerencia', 'Coordinación']);
+      allow create: if activo() && rol() in ['Operador', 'Administrador principal']
+        && maquinaValida(request.resource.data.equipo)
+        && request.resource.data.operadorUid == request.auth.uid
+        && request.resource.data.operador == miPerfil().data.nombre
+        && request.resource.data.inicio == request.time
+        && request.resource.data.estado == 'Abierto'
+        && request.resource.data.historial.size() == 0
+        && !('fin' in request.resource.data);
+      allow create: if gestor() && maquinaValida(request.resource.data.equipo)
+        && request.resource.data.historial.size() == 1;
+      allow update: if (activo() && resource.data.operadorUid == request.auth.uid
+            && resource.data.estado == 'Abierto'
+            && request.resource.data.estado == 'Cerrado'
+            && request.resource.data.fin == request.time
+            && cambia(['estado', 'fin', 'cierre']))
+        || (gestor() && request.resource.data.equipo == resource.data.equipo
+            && request.resource.data.operadorUid == resource.data.operadorUid
+            && request.resource.data.historial.size() == resource.data.get('historial', []).size() + 1);
+      allow delete: if false;
     }
 
     match /programa/{id} {

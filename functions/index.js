@@ -22,10 +22,23 @@ const ROLES_ESCALAR = ['Supervisor de mantenimiento', 'Coordinación', PRINCIPAL
 const MIN_ESCALAR = 10;
 const MAX_ESCALAR = 12; // hasta 2 horas
 const HORAS_AUTOCIERRE = 4;
-const MAQUINAS = {
-  'AMP-LA-001': { planta: 'AM Pack', zona: 'Línea A', nombre: 'Envasadora vertical' },
-  'AMP-LB-001': { planta: 'AM Pack', zona: 'Línea B', nombre: 'Envasadora vertical' },
+const LINEAS_BASE = { 'AMP-LA': { nombre: 'Línea A', planta: 'AM Pack' }, 'AMP-LB': { nombre: 'Línea B', planta: 'AM Pack' } };
+const MAQUINAS_BASE = {
+  'AMP-LA-001': { linea: 'AMP-LA', nombre: 'Envasadora vertical' },
+  'AMP-LB-001': { linea: 'AMP-LB', nombre: 'Envasadora vertical' },
 };
+// Datos de la máquina (planta, línea, nombre) desde el catálogo que administra el Administrador principal
+async function maqInfo(id) {
+  const base = MAQUINAS_BASE[id] || {};
+  let d = {};
+  try { const s = await db.doc('maquinas/' + id).get(); if (s.exists) d = s.data(); } catch (e) { logger.warn('maqInfo', e); }
+  const lid = d.linea || base.linea;
+  let l = LINEAS_BASE[lid] || {};
+  if (lid) { try { const s = await db.doc('lineas/' + lid).get(); if (s.exists) l = Object.assign({}, l, s.data()); } catch (e) { logger.warn('maqInfo línea', e); } }
+  const nombre = d.nombre || base.nombre || '';
+  const linea = l.nombre || id;
+  return { id, linea: lid || '', nombre, planta: l.planta || '', zona: linea + (nombre ? ' · ' + nombre : '') };
+}
 
 async function perfilDe(uid) {
   if (!uid) return null;
@@ -42,13 +55,13 @@ async function exigir(req, roles) {
 // AM Pack y CIC comparten mecánicos
 const GRUPOS_PLANTA = [['AM Pack', 'CIC']];
 function plantasDe(pl) { return GRUPOS_PLANTA.find(g => g.includes(pl)) || [pl]; }
-function leDebeLlegar(perfil, equipo, n, roles) {
+function leDebeLlegar(perfil, equipo, n, roles, m) {
   roles = roles || ROLES_AVISO;
   if (!perfil || perfil.activo !== true || !roles.includes(perfil.rol)) return false;
   if (!roles.includes('Coordinación') && perfil.rol === 'Supervisor de mantenimiento' && n > 1 && (n - 1) % 3 !== 0) return false;
-  const m = MAQUINAS[equipo];
-  if (perfil.linea && perfil.linea !== 'todas') return perfil.linea === equipo;
-  if (perfil.planta && m) return plantasDe(perfil.planta).includes(m.planta);
+  m = m || {};
+  if (perfil.linea && perfil.linea !== 'todas') return perfil.linea === equipo || (!!m.linea && perfil.linea === m.linea);
+  if (perfil.planta && m.planta) return plantasDe(perfil.planta).includes(m.planta);
   return true;
 }
 
@@ -100,17 +113,17 @@ async function destinosPara(equipo, n, roles) {
   // Mecánicos que ya atienden una falla no reciben avisos de otras máquinas hasta finalizar
   const enAtencion = await db.collection('registros').where('estado', '==', 'En atención').get();
   const ocupados = new Set(enAtencion.docs.map(d => d.data().atendidoUid).filter(Boolean));
-  const destinos = [];
+  const destinos = [], m = await maqInfo(equipo);
   for (const uid of Object.keys(porUid)) {
     const p = await perfilDe(uid);
     // Quien ya atiende una falla no recibe avisos de otras máquinas (salvo el escalamiento a supervisión)
     if (p && ocupados.has(uid) && !(roles || []).includes('Coordinación')) continue;
-    if (leDebeLlegar(p, equipo, n || 1, roles)) destinos.push(...porUid[uid]);
+    if (leDebeLlegar(p, equipo, n || 1, roles, m)) destinos.push(...porUid[uid]);
   }
   return destinos;
 }
 async function avisar(r, id, n) {
-  const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '', nombre: '' };
+  const m = await maqInfo(r.equipo);
   const titulo = (n > 1 ? '🚨🚨 SIN ATENDER (' + n + '/' + MAX_AVISOS + ') ' : '🚨 ') + 'Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
   const cuerpo = (r.tipoFalla || 'Falla') + ' — ' + String(r.actividad || '').slice(0, 140) + ' · Reportó ' + (r.tecnico || '');
   return enviar(await destinosPara(r.equipo, n), mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + id + '-' + n));
@@ -141,7 +154,7 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
     const yaEsc = r.escalado === true ? 1 : Number(r.escalado || 0);
     if (creado && yaEsc < MAX_ESCALAR && ahora - creado >= (yaEsc + 1) * MIN_ESCALAR * 60000) {
       await d.ref.update({ escalado: yaEsc + 1 });
-      const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
+      const m = await maqInfo(r.equipo);
       const out = await enviar(await destinosPara(r.equipo, 1, ROLES_ESCALAR), mensaje('⚠️ Falla sin atender ' + (yaEsc + 1) * MIN_ESCALAR + ' min · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — ningún mecánico la ha tomado. Reportó ' + (r.tecnico || ''), URL_BASE + '#alertas', 'esc-' + d.id + '-' + (yaEsc + 1)));
       logger.info('Escalamiento', d.id, out);
     }
@@ -169,7 +182,7 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
 exports.notificarReaperturaFalla = onDocumentUpdated('registros/{id}', async (event) => {
   const a = event.data.before.data() || {}, r = event.data.after.data() || {};
   if (r.tipo !== 'Reporte de falla' || a.estado !== 'Por confirmar' || !['Pendiente', 'Abierta'].includes(r.estado)) return;
-  const m = MAQUINAS[r.equipo] || { zona: r.equipo, planta: '' };
+  const m = await maqInfo(r.equipo);
   const out = await enviar(await destinosPara(r.equipo, 1), mensaje('🔁 Sigue fallando · ' + (m.planta ? m.planta + ' · ' : '') + m.zona, (r.tipoFalla || 'Falla') + ' — la operadora indicó que la máquina no quedó bien.', URL_BASE + '#alertas', 'reabierta-' + event.params.id + '-' + (r.reaperturas || 1)));
   logger.info('Reapertura', event.params.id, out);
 });
@@ -266,4 +279,22 @@ exports.probarNotificacion = onCall(async (req) => {
   const t = await db.collection('tokens').where('uid', '==', req.auth.uid).get();
   const out = await enviar(t.docs.map(d => d.id), mensaje('🔔 Prueba de notificación', 'Si ves esto, las alertas de fallas te llegarán aunque el teléfono esté bloqueado.', URL_BASE + '#cuenta', 'prueba'));
   return out;
+});
+
+// Candado de red: revisa desde qué IP entra la persona y, si es la de la empresa, le da acceso por 20 minutos
+function ipCoincide(ip, lista) {
+  return lista.some(x => x.endsWith('*') ? ip.startsWith(x.slice(0, -1)) : ip === x);
+}
+exports.verificarRed = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Inicia sesión.');
+  const h = (req.rawRequest && req.rawRequest.headers) || {};
+  const ip = String(h['x-forwarded-for'] || '').split(',')[0].trim() || String((req.rawRequest && req.rawRequest.ip) || '').replace('::ffff:', '');
+  const cfg = (await db.doc('config/red').get()).data() || {};
+  const ips = (cfg.ips || []).map(x => String(x).trim()).filter(Boolean);
+  const p = await perfilDe(req.auth.uid);
+  if (!p || p.activo !== true) throw new HttpsError('permission-denied', 'Cuenta inactiva.');
+  const exento = [PRINCIPAL, 'Dirección'].includes(p.rol);
+  const ok = !ips.length || exento || ipCoincide(ip, ips);
+  if (ips.length && ok) await db.doc('accesoRed/' + req.auth.uid).set({ ip, hasta: Timestamp.fromMillis(Date.now() + 20 * 60000), en: FieldValue.serverTimestamp() });
+  return { ok, ip, requerida: ips.length > 0, exento };
 });

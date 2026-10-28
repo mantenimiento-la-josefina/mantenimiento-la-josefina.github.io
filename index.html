@@ -213,10 +213,14 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .rank{margin:0;padding-left:22px}.rank li{margin-bottom:10px}
 .turno{border-left:6px solid var(--accent)}.turno.abierto{border-left-color:#2e9e5b}.turno button{width:100%}
 .filaTurno{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.filaTurno input[type=time]{width:auto;flex:0 0 auto}.filaTurno .chk{min-width:92px;margin:0}
+#nav.menu-p{display:block}.mp-grupos{display:flex;flex-wrap:wrap;gap:8px}.mp-g{background:var(--card);color:var(--accent);border:1px solid var(--accent-line);font-weight:700}
+.mp-g.actual{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}.mp-g[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink)}
+.mp-sub{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding:10px;background:var(--accent-soft);border-radius:12px}.mp-sub button{background:var(--card);color:var(--fg);border:1px solid var(--line)}.mp-sub button[aria-current]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.cathead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.cathead h2,.cathead h3{margin:0}.catlin{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0}.catmaq{gap:10px}.catform{background:var(--accent-soft);margin:10px 0}.selmaqsel{max-width:420px}
 </style>
 </head>
 <body>
-<header><div class="hin"><div class="marca"><img class="logo-letras" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><span class="divisor"></span><div><h1>Mantenimiento</h1><small class="plantas">Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div></div><div class="rojo"></div><div class="banda"><div class="sesion" id="sesion" hidden></div></div></header>
+<header><div class="hin"><div class="marca"><img class="logo-letras" src="logo-rojo.png" alt="La Josefina" width="800" height="225"><span class="divisor"></span><div><h1>Mantenimiento</h1><small class="plantas" id="plantasHeader">Plantas AM Pack · CIC · Ricaty · Flexi Pack</small></div></div></div><div class="rojo"></div><div class="banda"><div class="sesion" id="sesion" hidden></div></div></header>
 <div class="wrap">
   <div id="banner"></div>
   <nav id="nav" hidden></nav>
@@ -249,18 +253,43 @@ const VAPID_KEY = 'BPpQNpoqwGd5VJ8ZGXCVNtkfkRSyFx89CiMgdqbyqY3OKApqSqi7it2yBa_pK
 const SERVIDOR_LISTO = true; // se activa cuando el servidor (Cloud Functions) quedó instalado
 const DOMINIO = 'lajosefina-dpc.app'; // se entra con número de empleado; internamente es numero@DOMINIO
 const USUARIO_INICIAL = '1000';
-const MAQUINAS = [
-  {id:'AMP-LA-001',clave:'A',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea A'},
-  {id:'AMP-LB-001',clave:'B',nombre:'Envasadora vertical',planta:'AM Pack',zona:'Línea B'}
-];
 const PRINCIPAL = 'Administrador principal';
 const ROLES_ASIGNABLES = ['Administrador','Dirección','Gerencia','Coordinación','Supervisor de mantenimiento','Mecánico','Ingeniero de procesos','Operador'];
 const ROLES_MANTTO = ['Mecánico'];
 const ROLES_GESTION = [PRINCIPAL,'Supervisor de mantenimiento']; // corrigen registros, calendario y configuración
 const ROLES_SUPERVISION = [PRINCIPAL,'Administrador','Dirección','Gerencia']; // pueden dar de alta usuarios
 const RANGOS = {'Administrador':[1000,1099],'Dirección':[1000,1099],'Gerencia':[1100,1999],'Coordinación':[1100,1999],'Ingeniero de procesos':[4000,4999],'Supervisor de mantenimiento':[2000,2999],'Mecánico':[2000,2999],'Operador':[3000,3999]};
-const PLANTAS = ['AM Pack','CIC','Ricaty','Flexi Pack'];
+// ===== Catálogo: planta → línea → máquina (el Administrador principal lo administra en «Plantas y máquinas») =====
+const PLANTAS_BASE=['AM Pack','CIC','Ricaty','Flexi Pack'];
+const LINEAS_BASE=[{id:'AMP-LA',nombre:'Línea A',planta:'AM Pack'},{id:'AMP-LB',nombre:'Línea B',planta:'AM Pack'}];
+const MAQ_BASE=[{id:'AMP-LA-001',clave:'A',nombre:'Envasadora vertical',linea:'AMP-LA',incluye:'Báscula y codificador'},{id:'AMP-LB-001',clave:'B',nombre:'Envasadora vertical',linea:'AMP-LB',incluye:'Báscula y codificador'}];
+let catMaqListo=false,PLANTAS=PLANTAS_BASE.slice(),PLANTAS_TODAS=[],LINEAS=[],LINEAS_TODAS=[],MAQUINAS=[],MAQ_TODAS=[],PLANCFG={},LINCFG={};
+function slug(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toUpperCase().slice(0,40)}
+const cmpNat=(a,b)=>String(a).localeCompare(String(b),'es',{numeric:true});
+function reconstruirCatalogo(){
+  const pl={};PLANTAS_BASE.forEach((n,i)=>pl[slug(n)]={id:slug(n),nombre:n,activo:true,orden:i});
+  Object.entries(PLANCFG).forEach(([id,d])=>{pl[id]=Object.assign({id,orden:99,activo:true},pl[id]||{},d,{id})});
+  PLANTAS_TODAS=Object.values(pl).sort((a,b)=>(a.orden-b.orden)||cmpNat(a.nombre,b.nombre));
+  PLANTAS=PLANTAS_TODAS.filter(p=>p.activo!==false).map(p=>p.nombre);
+  const li={};LINEAS_BASE.forEach(l=>li[l.id]=Object.assign({activo:true,orden:0},l));
+  Object.entries(LINCFG).forEach(([id,d])=>{li[id]=Object.assign({activo:true,orden:0},li[id]||{},d,{id})});
+  LINEAS_TODAS=Object.values(li).map(l=>Object.assign(l,{area:l.area||l.planta,vigente:l.activo!==false&&PLANTAS.includes(l.planta)}))
+    .sort((a,b)=>(PLANTAS_TODAS.findIndex(p=>p.nombre===a.planta)-PLANTAS_TODAS.findIndex(p=>p.nombre===b.planta))||((a.orden||0)-(b.orden||0))||cmpNat(a.nombre,b.nombre));
+  LINEAS=LINEAS_TODAS.filter(l=>l.vigente);
+  const mq={};MAQ_BASE.forEach(m=>mq[m.id]=Object.assign({activo:true,orden:0},m));
+  Object.entries(MAQCFG).forEach(([id,d])=>{if(mq[id]||d.nombre)mq[id]=Object.assign({activo:true,orden:0},mq[id]||{},{nombre:d.nombre||(mq[id]||{}).nombre,linea:d.linea||(mq[id]||{}).linea,codigo:d.codigo??(mq[id]||{}).codigo,incluye:d.incluye??(mq[id]||{}).incluye,activo:d.activo!==false&&(mq[id]||{activo:true}).activo!==false,orden:d.orden??(mq[id]||{}).orden??0},{id})});
+  const lo=id=>li[id]||{nombre:'Sin línea',planta:'',area:'',vigente:false};
+  MAQ_TODAS=Object.values(mq).map(m=>{const l=lo(m.linea);return Object.assign(m,{lineaNom:l.nombre,planta:l.planta,area:l.area||l.planta,vigente:m.activo!==false&&!!l.vigente})});
+  MAQ_TODAS.forEach(m=>{const her=MAQ_TODAS.filter(x=>x.linea===m.linea&&x.vigente);m.zona=m.lineaNom+(her.length>1||!m.vigente&&her.length?' · '+m.nombre:'')});
+  const oL=id=>LINEAS_TODAS.findIndex(l=>l.id===id);
+  MAQ_TODAS.sort((a,b)=>(oL(a.linea)-oL(b.linea))||((a.orden||0)-(b.orden||0))||cmpNat(a.nombre,b.nombre));
+  MAQUINAS=MAQ_TODAS.filter(m=>m.vigente);
+  if(catMaqListo&&(!maq(maqSel)||!maq(maqSel).vigente))maqSel=(MAQUINAS[0]||MAQ_TODAS[0]||{}).id}
 function maquinasDe(pl){return MAQUINAS.filter(m=>m.planta===pl)}
+function lineasDe(pl){return LINEAS.filter(l=>l.planta===pl)}
+function etiquetaMaq(m){return m?m.nombre+' · '+m.lineaNom+(m.planta?' · '+m.planta:''):''}
+function opcionesAgrupadas(sel,conTodas,txtTodas){let h=conTodas?`<option value="todas" ${sel==='todas'?'selected':''}>${txtTodas||'Todas las máquinas'}</option>`:'';
+  LINEAS.forEach(l=>{const ms_=MAQUINAS.filter(m=>m.linea===l.id);if(!ms_.length)return;h+=`<optgroup label="${esc(l.planta+' · '+l.nombre)}">${ms_.map(m=>`<option value="${esc(m.id)}" ${m.id===sel?'selected':''}>${esc(m.nombre+' · '+m.lineaNom)}</option>`).join('')}</optgroup>`});return h}
 const COLOR_ROL = {'Administrador principal':'bad','Administrador':'bad','Dirección':'plan','Gerencia':'plan','Coordinación':'plan','Ingeniero de procesos':'plan','Supervisor de mantenimiento':'warn','Mecánico':'warn','Operador':''};
 const CERRADOS = ['Completado','Cerrada'];
 const POR_CONFIRMAR = 'Por confirmar';
@@ -270,7 +299,7 @@ const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  principal:['panel','ejecutivo','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
+  principal:['panel','ejecutivo','catalogo','red','reportes','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
   'Administrador':['usuarios','cuenta'],
   direccion:['ejecutivo','tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
   coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
@@ -295,11 +324,12 @@ const INICIO = {principal:'panel','Administrador':'usuarios',direccion:'ejecutiv
 let auth=null, db=null, fb=null;
 let usuario=null, perfil=null, subs=[];
 let REG=[], PROG=[], MAQCFG={}, USUARIOS=[], TURNOS=[], CFGIND={};
-let vista='', destino=null, maqSel=MAQUINAS[0].id, prefill=null, editId=null, maqForm=null;
+let vista='', destino=null, maqSel='AMP-LA-001', prefill=null, editId=null, maqForm=null;
 let calMes=null, diaSel=null, calMaq='todas', indMaq='todas', histTipo='Todos';
 let filtro={maq:'todas',estado:'todos',tipo:'Todos',desde:'',hasta:''};
 let ESTADO_PREV={}, estabaOcupado=false, escaneoPendiente=null, pendiente=false, primeraCarga=true, finalizando=null, maqFija=null, tableroCompleto=false;
 let audioCtx=null, sonidoOn=false, silencioHasta=0, ultimoSonido=0, wakeLock=null;
+reconstruirCatalogo();
 
 // ===== Utilidades =====
 const $=id=>document.getElementById(id);
@@ -314,9 +344,9 @@ function sumarDias(s,n){const d=aFecha(s);d.setDate(d.getDate()+Number(n));retur
 function dur(ms){if(ms==null||isNaN(ms)||ms<0)return '—';const s=Math.floor(ms/1000);if(s<60)return s+' s';const m=Math.floor(s/60);if(m<60)return m+' min '+String(s%60).padStart(2,'0')+' s';const h=Math.floor(m/60);return h+' h '+String(m%60).padStart(2,'0')+' min'}
 function durMin(ms){if(ms==null||isNaN(ms)||ms<0)return '—';const m=Math.round(ms/60000);if(m<60)return m+' min';return Math.floor(m/60)+' h '+String(m%60).padStart(2,'0')+' min'}
 function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>e.hidden=true,3200)}
-function maq(id){return MAQUINAS.find(m=>m.id===id)}
-function maqPorClave(c){return MAQUINAS.find(m=>m.clave===String(c||'').toUpperCase())}
-function tagMaq(id){const m=maq(id);if(!m)return `<span class="tag neu">${esc(id)}</span>`;return `<span class="tag ${m.clave==='A'?'la':'lb'}">${esc(m.zona)}</span>`}
+function maq(id){return MAQ_TODAS.find(m=>m.id===id)}
+function maqPorClave(c){return MAQ_TODAS.find(m=>m.clave&&m.clave===String(c||'').toUpperCase())}
+function tagMaq(id){const m=maq(id);if(!m)return `<span class="tag neu">${esc(id)}</span>`;return `<span class="tag ${m.clave==='B'?'lb':'la'}">${esc(m.zona)}</span>`}
 function tagEstado(e){if(e===POR_CONFIRMAR)return `<span class="tag plan">Por confirmar</span>`;if(CERRADOS.includes(e))return `<span class="tag">${esc(e)}</span>`;if(EN_ATENCION.includes(e))return `<span class="tag warn">${esc(e)}</span>`;return `<span class="tag bad">${esc(e||'Pendiente')}</span>`}
 function tagTipo(t){if(t==='Reporte de falla')return `<span class="tag bad">Falla</span>`;if(t==='Correctivo')return `<span class="tag warn">Correctivo</span>`;if(t==='Preventivo')return `<span class="tag plan">Preventivo</span>`;return `<span class="tag neu">${esc(t)}</span>`}
 function activoP(){return !!perfil&&perfil.activo===true}
@@ -326,11 +356,12 @@ function esSupervisor(){return activoP()&&ROLES_SUPERVISION.includes(perfil.rol)
 function esCoordinacion(){return activoP()&&perfil.rol==='Coordinación'}
 function grupo(){if(!perfil)return '';if(esPrincipal())return 'principal';if(['Dirección','Gerencia'].includes(perfil.rol))return 'direccion';if(perfil.rol==='Coordinación')return 'coordinacion';return perfil.rol}
 const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r){return ROL_TXT[r]||r}
-function misLineas(){const l=perfil&&perfil.linea;return !l||l==='todas'?null:[l]}
+function misLineas(){const l=perfil&&perfil.linea;if(!l||l==='todas')return null;if(maq(l))return [l];return MAQ_TODAS.filter(m=>m.linea===l).map(m=>m.id)}
 // AM Pack y CIC comparten mecánicos: quien es de una atiende las dos
 const GRUPOS_PLANTA=[['AM Pack','CIC']];
 function plantasDe(pl){return GRUPOS_PLANTA.find(g=>g.includes(pl))||[pl]}
-function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);return !pl||!m||plantasDe(pl).includes(m.planta)}
+function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);if(!m)return false;return !pl||!m.planta||plantasDe(pl).includes(m.planta)}
+function catalogoCambio(){render();try{if(perfil&&insiste()&&misPendientes().length&&$('alarma').hidden)abrirAlarma()}catch(e){}}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
 const HORAS_TURNO=8, ROLES_TURNO=['Mecánico','Supervisor de mantenimiento','Operador','Ingeniero de procesos'];
 function tieneTurno(){return activoP()&&ROLES_TURNO.includes(perfil.rol)}
@@ -395,9 +426,9 @@ const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 // ===== Dirección (QR y enlaces) =====
 function leerDireccion(){
   const q=new URLSearchParams(location.search);const h=(location.hash||'').replace('#','');
-  const m=maqPorClave(q.get('m'))||MAQUINAS.find(x=>x.id===q.get('equipo'));
+  const mid=(maqPorClave(q.get('m'))||{}).id||q.get('equipo'),m=mid?{id:mid}:null;
   if(m)return h==='ficha'?{vista:'ficha',maq:m.id}:{vista:'qr',maq:m.id};
-  if(h==='ficha')return {vista:'ficha',maq:MAQUINAS[0].id};
+  if(h==='ficha')return {vista:'ficha',maq:'AMP-LA-001'};
   const f=h.match(/^ficha-([ab])$/i);if(f)return {vista:'ficha',maq:maqPorClave(f[1]).id};
   if(h)return {vista:h};
   return null;
@@ -414,7 +445,7 @@ function iniciar(){
   const app=fb.apps.length?fb.app():fb.initializeApp(FIREBASE_CONFIG);
   auth=app.auth();db=app.firestore();
   destino=leerDireccion();
-  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
+  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};catMaqListo=false;USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
     if(!u){pantallaLogin();return}
     $('app').innerHTML='<div class="card"><p class="muted">Cargando tu cuenta…</p></div>';
     let listo=false,rolAntes=null;
@@ -422,7 +453,7 @@ function iniciar(){
       if(!usuario||usuario.uid!==u.uid)return;
       perfil=s.exists?s.data():null;
       if(!perfil||perfil.activo!==true){cerrarSubs(true);listo=false;pantallaSinAcceso();return}
-      if(!listo||rolAntes!==perfil.rol){cerrarSubs(true);listo=true;rolAntes=perfil.rol;suscribir();entrar()}else{pintarSesion();render()}
+      if(!listo||rolAntes!==perfil.rol){cerrarSubs(true);listo=true;rolAntes=perfil.rol;chequearRed().then(ok=>{if(!usuario||usuario.uid!==u.uid||!perfil)return;if(ok){suscribir();entrar()}else{pintarSesion();pantallaRed()}})}else{pintarSesion();render()}
     },e=>{pantallaSinAcceso(errTxt(e))}));
   });
 }
@@ -430,6 +461,9 @@ function cerrarSubs(dejarPerfil){const keep=dejarPerfil?subs.slice(0,1):[];subs.
 function suscribir(){
   const err=e=>{console.warn(e);toast(errTxt(e))};
   primeraCarga=true;
+  subs.push(db.collection('maquinas').onSnapshot(s=>{catMaqListo=true;MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());reconstruirCatalogo();catalogoCambio()},err));
+  subs.push(db.collection('plantas').onSnapshot(s=>{PLANCFG={};s.docs.forEach(d=>PLANCFG[d.id]=d.data());reconstruirCatalogo();pintarPlantasHeader();catalogoCambio()},e=>console.warn(e)));
+  subs.push(db.collection('lineas').onSnapshot(s=>{LINCFG={};s.docs.forEach(d=>LINCFG[d.id]=d.data());reconstruirCatalogo();catalogoCambio()},e=>console.warn(e)));
   subs.push(db.collection('registros').onSnapshot(s=>{
     if(!usuario||!perfil)return;
     REG=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
@@ -440,7 +474,6 @@ function suscribir(){
     if(!primeraCarga&&avisa()){const nv=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nv.length){sirenaSuave(true);const m=maq(nv[0].equipo);toast('🚨 Nueva falla en '+(m?m.zona:nv[0].equipo)+': '+(nv[0].tipoFalla||''));parpadearTitulo()}}
     if(!primeraCarga&&insiste()&&!ocupado()){const nuevas=s.docChanges().filter(c=>c.type==='added'&&!c.doc.metadata.hasPendingWrites).map(c=>c.doc.data({serverTimestamps:'estimate'})).filter(fallaPendiente).filter(deMiLinea);if(nuevas.length)nuevaFalla(nuevas[0])}
     const eraPrimera=primeraCarga;primeraCarga=false;const oc=ocupado(),libero=estabaOcupado&&!oc;estabaOcupado=oc;if(libero&&insiste()&&misPendientes().length)setTimeout(abrirAlarma,0);pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
-  subs.push(db.collection('maquinas').onSnapshot(s=>{MAQCFG={};s.docs.forEach(d=>MAQCFG[d.id]=d.data());render()},err));
   if(verInventario()||puedeRegistrar()){subs.push(db.collection('refacciones').onSnapshot(s=>{REF=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
     if(esAdmin()||grupo()==='direccion'){let q=db.collection('movimientos');try{if(q.orderBy)q=q.orderBy('fecha','desc').limit(80)}catch(e){}subs.push(q.onSnapshot(s=>{MOV=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()},err))}}
   subs.push(db.collection('config').doc('indicadores').onSnapshot(s=>{CFGIND=s.exists?s.data()||{}:{};render()},e=>console.warn(e)));
@@ -465,10 +498,11 @@ function pintarSesion(){
   const s=$('sesion');s.hidden=false;
   s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(rolTxt(perfil.rol))} · ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
   const n=$('nav');n.hidden=false;n.className=perfil.rol==='Operador'?'grande':'';
+  if(grupo()==='principal'){pintarMenuPrincipal();return}
   n.innerHTML=(NAV[grupo()]||[]).map(([v,t])=>`<button data-v="${v}">${t}</button>`).join('');
   marcarNav();
 }
-function marcarNav(){document.querySelectorAll('#nav button').forEach(b=>{const act=b.dataset.v===vista||(vista==='ficha'&&b.dataset.v==='maquinas');if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
+function marcarNav(){if(grupo()==='principal'){pintarMenuPrincipal();return}document.querySelectorAll('#nav button').forEach(b=>{const act=b.dataset.v===vista||(vista==='ficha'&&b.dataset.v==='maquinas');if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
 
 // ===== Pantallas de acceso =====
 function ocultarSesion(){$('sesion').hidden=true;$('nav').hidden=true;document.body.classList.remove('modo-pantalla')}
@@ -477,7 +511,7 @@ function pantallaLogin(){
   const m=destino&&destino.maq?maq(destino.maq):null;
   $('app').innerHTML=`<div class="login"><div class="card"><h2>Iniciar sesión</h2>
   ${LS.get('dpc_aviso_turno',0)?(LS.set('dpc_aviso_turno',0),`<p class="aviso">Tu sesión se cerró al cumplir ${HORAS_TURNO} horas de turno. Vuelve a entrar cuando inicies tu siguiente turno.</p>`):''}
-  ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}.</p>`:''}
+  ${m?`<p class="aviso">Al entrar podrás reportar una falla en la ${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.lineaNom)}.</p>`:''}
   <form id="fLogin"><label for="l_user">Usuario</label><input id="l_user" name="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="l_pass">Contraseña</label><input id="l_pass" name="p" type="password" autocomplete="current-password" required>
   <div class="acciones"><button type="submit" class="xl">Entrar</button></div><div id="lErr"></div></form>
@@ -563,7 +597,7 @@ async function abrirEscaner(){const e=$('escaner');e.hidden=false;
   try{await cargarJsQR();escStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
     const v=$('escVideo');v.srcObject=escStream;await v.play();const c=document.createElement('canvas'),g=c.getContext('2d',{willReadFrequently:true});
     const paso=()=>{if(!escStream)return;if(v.readyState>=2){c.width=v.videoWidth;c.height=v.videoHeight;g.drawImage(v,0,0);const d=g.getImageData(0,0,c.width,c.height);const q=window.jsQR(d.data,c.width,c.height,{inversionAttempts:'dontInvert'});
-      if(q&&q.data){let id=null;try{const u=new URL(q.data);const mm=maqPorClave(u.searchParams.get('m'))||MAQUINAS.find(x=>x.id===u.searchParams.get('equipo'));id=mm&&mm.id}catch(er){}
+      if(q&&q.data){let id=null;try{const u=new URL(q.data);const mm=maqPorClave(u.searchParams.get('m'))||MAQ_TODAS.find(x=>x.id===u.searchParams.get('equipo'));id=mm&&mm.id}catch(er){}
         if(id){try{navigator.vibrate&&navigator.vibrate(150)}catch(er){}cerrarEscaner();procesarEscaneo(id);return}
         $('escMsg').textContent='Ese código no es de una máquina del sistema. Intenta con el QR pegado en la máquina.'}}
       escLoop=requestAnimationFrame(paso)};paso()}
@@ -662,10 +696,13 @@ function filas(arr,opc={}){
   </tr>`}).join('')}</tbody></table></div>`;
 }
 function kpi(n,t){return `<div class="card kpi"><h2>${n}</h2><span>${t}</span></div>`}
-function selMaq(actual,attr,conTodas){return `<div class="selmaq">${conTodas?`<button data-${attr}="todas" aria-pressed="${actual==='todas'}">Ambas líneas</button>`:''}${MAQUINAS.map(m=>`<button data-${attr}="${m.id}" aria-pressed="${actual===m.id}">${esc(m.zona)}</button>`).join('')}</div>`}
-function opcionesMaq(sel,vacio){return (vacio&&!sel?'<option value="" selected disabled>Selecciona la máquina…</option>':'')+MAQUINAS.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.nombre)} · ${esc(m.planta)} · ${esc(m.zona)}</option>`).join('')}
+function selMaq(actual,attr,conTodas){if(MAQUINAS.length<=4)return `<div class="selmaq">${conTodas?`<button data-${attr}="todas" aria-pressed="${actual==='todas'}">Todas</button>`:''}${MAQUINAS.map(m=>`<button data-${attr}="${m.id}" aria-pressed="${actual===m.id}">${esc(m.zona)}</button>`).join('')}</div>`;
+  return `<div class="selmaq"><select class="selmaqsel" data-attr="${attr}" aria-label="Máquina">${opcionesAgrupadas(actual,conTodas)}</select></div>`}
+document.addEventListener('change',e=>{const t=e.target.closest&&e.target.closest('.selmaqsel');if(!t)return;const v=t.value,a=t.dataset.attr;
+  if(a==='ficha'){maqSel=v;ir('ficha');return}if(a==='hist'){maqSel=v;render(true);return}if(a==='ab')filtro.maqAb=v;if(a==='calmaq')calMaq=v;if(a==='indmaq')indMaq=v;render(true)});
+function opcionesMaq(sel,vacio){return (vacio&&!sel?'<option value="" selected disabled>Selecciona la máquina…</option>':'')+opcionesAgrupadas(sel)}
 function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=en&&r.atendidoUid===usuario.uid;
-  return `<div class="fcard ${en?'atencion':''}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(m?m.nombre+' · '+m.zona:r.equipo)}</h3><span class="reloj" data-desde="${en?ms(r.inicioAtencion)||msCreado(r):msCreado(r)}"></span></div>
+  return `<div class="fcard ${en?'atencion':''}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(m?m.nombre+' · '+m.lineaNom:r.equipo)}</h3><span class="reloj" data-desde="${en?ms(r.inicioAtencion)||msCreado(r):msCreado(r)}"></span></div>
   <p style="margin:0 0 6px"><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' <span class="tag bad">Línea detenida</span>':''} ${tagEstado(r.estado)}</p>
   <p style="margin:0 0 6px">${esc(r.actividad)}</p>
   <small class="muted">Reportó ${esc(r.tecnico)} a las ${hhmm(msCreado(r))||esc(r.hora)}${en?` · Atiende <b>${esc(r.atendidoPor||'')}</b> desde ${hhmm(ms(r.inicioAtencion))}`:''}</small>
@@ -714,7 +751,7 @@ V.panel=()=>{
   return `${migPrincipal?`<div class="card" style="border:2px solid var(--accent)"><h2>🔴 Activar Administrador principal</h2><p>Tu cuenta <b>${USUARIO_INICIAL}</b> pasará de «Dirección» a «Administrador principal», con acceso completo y la administración de usuarios. Se conserva toda la información.</p><div class="acciones"><button id="hacerPrincipal">Activar Administrador principal</button></div><div id="hpErr"></div></div>`:''}
   ${mig?`<div class="aviso"><b>Registros de la versión anterior:</b> este dispositivo tiene ${mig} registro(s) guardados antes de la base de datos (Línea A). <button class="mini" id="migrar" style="margin-left:6px">Subirlos al sistema</button></div>`:''}
   <div class="grid">${kpi(regs.length,'Trabajos registrados')}${kpi(ab.length,'Trabajos abiertos')}${kpi(regs.filter(fallaPendiente).length,'Fallas sin atender')}${kpi(regs.filter(fallaEnAtencion).length,'Fallas en atención')}</div>
-  <div class="grid2">${MAQUINAS.map(m=>{const e=estadoMaq(m.id),p=proximo(m.id),r=registros(m.id);return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.nombre)} · ${esc(m.zona)}</h2><p style="margin:0 0 8px">${tagMaq(m.id)} <span class="tag ${e.cls}">${esc(e.txt)}</span></p>
+  <div class="grid2">${MAQUINAS.map(m=>{const e=estadoMaq(m.id),p=proximo(m.id),r=registros(m.id);return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.nombre)} · ${esc(m.lineaNom)}</h2><p style="margin:0 0 8px">${tagMaq(m.id)} <span class="tag ${e.cls}">${esc(e.txt)}</span></p>
     <dl class="dl"><dt>Trabajos</dt><dd>${r.length}</dd><dt>Abiertos</dt><dd>${r.filter(abierto).length}</dd><dt>Próximo mantenimiento</dt><dd>${p?fmt(p.fecha)+(p.vencido?' <span class="tag bad">Vencido</span>':''):'Sin programar'}</dd></dl>
     <div class="acciones"><button class="sec" data-ficha="${m.id}">Ver ficha</button><button class="sec" data-verabiertos="${m.id}">Ver abiertos</button></div></div>`}).join('')}</div>
   <div class="card"><h2>Últimos registros</h2>${filas(regs.slice(0,8))}</div>`;
@@ -746,7 +783,7 @@ V.pantalla=()=>{const pend=REG.filter(fallaPendiente).filter(r=>!esMecanico()||d
 V.maquinas=()=>PLANTAS.map(pl=>{const ms_=maquinasDe(pl);return `<h2>Planta ${esc(pl)}</h2>`+(ms_.length?`<div class="grid2">${ms_.map(m=>{const e=estadoMaq(m.id),r=registros(m.id),ult=r[0];return `<div class="card"><h2 style="margin-bottom:4px">${esc(m.id)} · ${esc(m.nombre)}</h2><p style="margin:0">${tagMaq(m.id)} <span class="tag">${esc(m.planta)}</span></p>
   <dl class="dl"><dt>Estado actual</dt><dd><span class="tag ${e.cls}">${esc(e.txt)}</span></dd><dt>Último trabajo</dt><dd>${ult?fmt(ult.fecha)+' · '+esc(ult.tipo):'Sin registros'}</dd></dl>
   <div class="acciones"><button data-ficha="${m.id}">Ver ficha e historial</button></div></div>`}).join('')}</div>`:`<div class="card"><p class="muted" style="margin:0">Todavía no hay líneas registradas en esta planta.</p></div>`)}).join('');
-V.ficha=()=>{
+V.ficha=()=>{if(!maq(maqSel))return '<div class="card"><p class="muted">Cargando máquina…</p></div>';
   const m=maq(maqSel),regs=registros(m.id),p=proximo(m.id),c=MAQCFG[m.id]||{},e=estadoMaq(m.id);
   const ult=regs.find(r=>r.tipo==='Preventivo'&&r.estado==='Completado');
   return `${selMaq(m.id,'ficha',false)}<div class="card"><h2 style="margin-bottom:4px">${esc(m.id)} · ${esc(m.nombre)}</h2><p style="margin:0">${tagMaq(m.id)} <span class="tag">${esc(m.planta)}</span></p>
@@ -761,8 +798,8 @@ V.ficha=()=>{
   <form id="fCfg" class="dos"><div><label for="frec">Cada cuántos días</label><input id="frec" type="number" min="1" max="730" value="${esc(c.frecuenciaDias||'')}" placeholder="Ej. 30"></div><div style="display:flex;align-items:flex-end"><button type="submit" style="margin-top:12px">Guardar frecuencia</button></div></form></div>
   ${formHorario(m.id)}${formUmbrales()}
   <div class="card"><h2>Turnos registrados con QR · ${esc(m.zona)}</h2><p class="muted">Las operadoras inician y finalizan su turno al escanear el QR. Las correcciones quedan en un historial.</p>${corrTurno?formCorrTurno():`<div class="acciones" style="margin-top:0"><button class="sec mini" id="nuevoTurno">+ Registrar turno que no se capturó</button></div>`}${listaTurnosMaq(m.id)}</div>
-  <div class="card"><h2>Código QR · ${esc(m.zona)}</h2><div class="qr"><div class="qrbox" id="qrbox"></div><div style="min-width:0;flex:1"><p>Este código abre directamente la ficha de la ${esc(m.nombre)} · ${esc(m.zona)}. Si el trabajador no ha iniciado sesión, primero se le piden sus datos.</p><p class="url" id="qrurl">${esc(urlQR(m.id))}</p>
-  <div class="acciones"><button class="sec" id="bajarQR">Descargar QR (PNG)</button><button class="sec" id="imprimirQR">Imprimir QR de ambas líneas</button><button class="sec" id="copiarQR">Copiar enlace</button></div></div></div></div>`:''}`;
+  <div class="card"><h2>Código QR · ${esc(m.zona)}</h2><div class="qr"><div class="qrbox" id="qrbox"></div><div style="min-width:0;flex:1"><p>Este código, con el logo de La Josefina al centro, abre el reporte de falla de ${esc(m.nombre)} · ${esc(m.lineaNom)}. Si el trabajador no ha iniciado sesión, primero se le piden sus datos.</p><p class="url" id="qrurl">${esc(urlQR(m.id))}</p>
+  <div class="acciones"><button class="sec" id="bajarQR">Descargar QR (PNG)</button><button class="sec" id="imprimirQR">Imprimir QR de todas las máquinas</button><button class="sec" id="copiarQR">Copiar enlace</button></div></div></div></div>`:''}`;
 };
 function formMant(){
   const ed=editId?REG.find(r=>r.id===editId):null,pf=ed||prefill||{},adm=esAdmin(),eq=pf.equipo||maqForm,fallaEd=ed&&esFalla(ed);
@@ -784,8 +821,10 @@ V.registrar=()=>!editId&&!puedeRegistrar()?'<div class="card"><h2>Registrar trab
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));const porConf=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r)).sort((a,b)=>(ms(a.finAtencion)||0)-(ms(b.finAtencion)||0));
   return `${tarjetaTurno()}${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
   ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
-    if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.zona)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
-    return `<label>Máquina</label><div class="opciones">${MAQUINAS.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> Envasadora ${esc(m.zona)}</label>`).join('')}</div>`})()}
+    if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.lineaNom)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
+    const lista=misLineas()&&misLineas().length?MAQUINAS.filter(m=>misLineas().includes(m.id)):MAQUINAS;
+    if(lista.length<=6)return `<label>Máquina</label><div class="opciones">${lista.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> ${esc(m.nombre)} · ${esc(m.lineaNom)}</label>`).join('')}</div>`;
+    return `<label for="f_maqsel">Máquina</label><select id="f_maqsel" required>${opcionesMaq(maqForm,true)}</select>`})()}
   <label for="f_tipo">Tipo de falla</label><select id="f_tipo" required><option value="" selected disabled>Selecciona el tipo de falla…</option>${TIPOS_FALLA.map(t=>`<option>${t}</option>`).join('')}</select>
   <label>¿La línea está detenida?</label><div class="opciones"><label><input type="radio" name="f_paro" value="si" required> Sí, está detenida</label><label><input type="radio" name="f_paro" value="no"> No, sigue trabajando</label></div>
   <label for="f_desc">Descripción del problema</label><textarea id="f_desc" required maxlength="2000" placeholder="Qué pasa, en qué parte de la máquina, qué se observa"></textarea>
@@ -793,14 +832,14 @@ V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>ms
   <p class="muted" style="margin:10px 0 0">Se registrarán automáticamente la fecha, la hora y tu nombre (${esc(perfil.nombre)}).</p>
   <div class="acciones"><button type="submit" class="falla xl">Enviar reporte</button></div><div id="fErr"></div></form></div>
   <div class="card"><h2>Fallas abiertas</h2>${visibles.length?visibles.map(r=>`<div class="item"><div>${tagMaq(r.equipo)} <b>${esc(r.tipoFalla||'Falla')}</b><br><small class="muted">${esc(r.actividad)}</small><br><small class="muted">Reportó ${esc(r.tecnico)} · <span data-desde="${msCreado(r)}"></span>${r.atendidoPor?' · Atiende '+esc(r.atendidoPor):''}</small></div>${tagEstado(r.estado)}</div>`).join(''):'<p class="muted">No hay fallas abiertas.</p>'}</div>`};
-V.historial=()=>{const m=maq(maqSel),regs=registros(m.id).filter(r=>histTipo==='Todos'||r.tipo===histTipo);
-  return `${selMaq(m.id,'hist',false)}<div class="card"><h2>Historial de ajustes y reparaciones · ${esc(m.nombre)} · ${esc(m.zona)}</h2>
+V.historial=()=>{if(!maq(maqSel))maqSel=(MAQUINAS[0]||{}).id;const m=maq(maqSel),regs=registros(m.id).filter(r=>histTipo==='Todos'||r.tipo===histTipo);
+  return `${selMaq(m.id,'hist',false)}<div class="card"><h2>Historial de ajustes y reparaciones · ${esc(m.nombre)} · ${esc(m.lineaNom)}</h2>
   <div class="dos"><div><label for="histTipo">Filtrar por tipo</label><select id="histTipo">${['Todos',...TIPOS,'Reporte de falla'].map(t=>`<option ${t===histTipo?'selected':''}>${t}</option>`).join('')}</select></div></div>
   <p class="muted">${regs.length} registro(s)</p>${filas(regs,{sinMaq:true,vacio:'Todavía no hay trabajos registrados para esta máquina.'})}</div>`};
 function filtrar(){return registros(filtro.maq).filter(r=>(filtro.estado==='todos'||(filtro.estado==='abiertos'?abierto(r):!abierto(r)))&&(filtro.tipo==='Todos'||r.tipo===filtro.tipo)&&(!filtro.desde||r.fecha>=filtro.desde)&&(!filtro.hasta||r.fecha<=filtro.hasta))}
 V.trabajos=()=>{const regs=filtrar();
   return `<div class="card"><h2>Trabajos registrados</h2><div class="filtros">
-  <div><label for="fl_maq">Máquina</label><select id="fl_maq"><option value="todas">Todas</option>${MAQUINAS.map(m=>`<option value="${m.id}" ${filtro.maq===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
+  <div><label for="fl_maq">Máquina</label><select id="fl_maq">${opcionesAgrupadas(filtro.maq,true,'Todas')}</select></div>
   <div><label for="fl_est">Estado</label><select id="fl_est">${[['todos','Todos'],['abiertos','Abiertos'],['finalizados','Finalizados']].map(([v,t])=>`<option value="${v}" ${filtro.estado===v?'selected':''}>${t}</option>`).join('')}</select></div>
   <div><label for="fl_tipo">Tipo</label><select id="fl_tipo">${['Todos',...TIPOS,'Reporte de falla'].map(t=>`<option ${t===filtro.tipo?'selected':''}>${t}</option>`).join('')}</select></div>
   <div><label for="fl_desde">Desde</label><input id="fl_desde" type="date" value="${esc(filtro.desde)}"></div>
@@ -909,15 +948,16 @@ async function confirmarImport(btn){btn.disabled=true;btn.textContent='Cargando�
   await db.collection('movimientos').doc().set({tipo:'Carga de archivo',nombre:importPrev.archivo,cantidad:filas.length,uid:usuario.uid,usuario:perfil.nombre,fecha:TS()});
   toast('📦 '+filas.length+' refacciones cargadas.');importPrev=null;render(true)}catch(e){toast(errTxt(e));btn.disabled=false;btn.textContent='Reintentar'}}
 function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.numEmpleado||u.usuario)));for(let n=r[0]+1;n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
-function nombreLinea(l){if(!l||l==='todas')return 'Todas las líneas';const m=maq(l);return m?m.zona:l}
+function nombreLinea(l){if(!l||l==='todas')return 'Todas las líneas';const m=maq(l);if(m)return m.zona;const x=LINEAS_TODAS.find(y=>y.id===l);return x?x.nombre:l}
+function opcionesLineaUsr(pl,sel){const ls=LINEAS.filter(l=>plantasDe(pl).includes(l.planta));return `<option value="todas" ${!sel||sel==='todas'?'selected':''}>Todas las líneas de la planta</option>`+ls.map(l=>`<option value="${esc(l.id)}" ${sel===l.id?'selected':''}>${esc(l.nombre+(l.planta!==pl?' ('+l.planta+')':''))}</option>`).join('')+(sel&&sel!=='todas'&&!ls.some(l=>l.id===sel)?`<option value="${esc(sel)}" selected>${esc(nombreLinea(sel))}</option>`:'')}
 let usrEdit=null, usrAlta=false, usrFiltro='';
 function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],linea:'todas',activo:true};
   return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
   <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
   <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option value="${r}" ${r===u.rol?'selected':''}>${rolTxt(r)}</option>`).join('')}</select></div>
-  <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta">${PLANTAS.map(p=>`<option ${p===u.planta?'selected':''}>${p}</option>`).join('')}</select></div></div>
-  <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea"><option value="todas" ${!u.linea||u.linea==='todas'?'selected':''}>Todas las líneas de la planta</option>${maquinasDe(u.planta||PLANTAS[0]).map(m=>`<option value="${m.id}" ${u.linea===m.id?'selected':''}>${esc(m.zona)}</option>`).join('')}</select></div>
+  <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta">${PLANTAS.concat(u.planta&&!PLANTAS.includes(u.planta)?[u.planta]:[]).map(p=>`<option ${p===u.planta?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
+  <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea">${opcionesLineaUsr(u.planta||PLANTAS[0],u.linea)}</select></div>
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
   ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>
   <div><label for="u_pass">Contraseña inicial (mín. 6)</label><input id="u_pass" required minlength="6" autocomplete="new-password"></div></div>
@@ -955,7 +995,6 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
 V.cuenta=()=>`<div class="card"><h2>Mi cuenta</h2><dl class="dl"><dt>Nombre</dt><dd>${esc(perfil.nombre)}</dd><dt>Usuario</dt><dd>${esc(usuarioDe(usuario.email))}</dd>${finTurno()?`<dt>Sesión</dt><dd>Se cierra a las ${hhmm(finTurno())} (${HORAS_TURNO} h de turno)</dd>`:'<dt>Sesión</dt><dd>Permanece abierta</dd>'}${perfil.numEmpleado?`<dt>No. empleado</dt><dd>${esc(perfil.numEmpleado)}</dd>`:''}<dt>Línea</dt><dd>${esc(nombreLinea(perfil.linea))}</dd><dt>Puesto</dt><dd>${esc(perfil.rol)}</dd></dl></div>
   ${conAlertas()?(()=>{const ep=estadoPush();const txt={'activo':'✅ Activas en este teléfono.','pendiente':'Todavía no están activas en este teléfono.','ios-instalar':'En iPhone primero agrega la página a la pantalla de inicio (Compartir → «Agregar a inicio») y ábrela desde ese ícono.','bloqueado':'Están bloqueadas. Actívalas en los ajustes del navegador o del teléfono para esta app.','no-soportado':'Este navegador no las permite. Usa Chrome en Android o Safari en iPhone (desde la pantalla de inicio).','no-listo':'Se activarán cuando termine la instalación del servidor.'}[ep];
     return `<div class="card"><h2>🔔 Notificaciones de fallas</h2><p>${txt}</p><div class="acciones">${ep==='pendiente'||ep==='activo'?`<button id="activarPush">${ep==='activo'?'Volver a registrar este teléfono':'Activar notificaciones'}</button>`:''}${ep==='activo'?'<button class="sec" id="probarPush">Enviar notificación de prueba</button>':''}</div></div>`})():''}
-  ${esPrincipal()?`<div class="card"><h2>🗄️ Respaldo</h2><p>Firebase guarda una <b>copia completa de la base de datos cada domingo</b> y conserva las últimas 8 semanas. Si algo se borra por error, se puede recuperar.</p><div class="acciones"><button class="sec" id="descargarRespaldo">Descargar respaldo ahora</button></div><p class="muted">El archivo descargado incluye trabajos, fallas, calendario, máquinas, inventario y usuarios (sin contraseñas ni fotos).</p></div>`:''}
   ${esPrincipal()?`<div class="card"><h2>Mi nombre</h2><form id="fNombre"><label for="n_nom">Nombre completo</label><input id="n_nom" required maxlength="80" value="${esc(perfil.nombre)}"><div class="acciones"><button type="submit">Guardar nombre</button></div><div id="nErr"></div></form></div>`:''}
   <div class="card"><h2>Cambiar contraseña</h2><form id="fPass"><label for="c_pass">Nueva contraseña (mín. 6)</label><input id="c_pass" type="password" minlength="6" required autocomplete="new-password">
   <label for="c_pass2">Repite la nueva contraseña</label><input id="c_pass2" type="password" minlength="6" required autocomplete="new-password">
@@ -1028,9 +1067,9 @@ function calcMaq(m,a,b,now){const fin=Math.min(b,now);
 function agregar(l){const sum=k=>l.reduce((t,x)=>t+(x[k]||0),0),cp=l.filter(x=>x.prog!=null),P=cp.reduce((t,x)=>t+x.prog,0),PP=cp.reduce((t,x)=>t+x.paroProg,0),perdPct=P?PP/P*100:null;
   return {n:l.length,nf:sum('nf'),paros:sum('paros'),veces:sum('veces'),paroTot:sum('paroTot'),perdido:sum('perdido'),prog:cp.length?P:null,paroProg:cp.length?PP:null,perdPct,disp:P?Math.max(0,1-PP/P):null,sem:semaforo(perdPct),
     resp:[].concat(...l.map(x=>x.resp)),rep:[].concat(...l.map(x=>x.rep)),resueltas:sum('resueltas'),trabajos:sum('trabajos'),sinFin:sum('sinFin'),turnoH:sum('turnoH'),sinHorario:l.filter(x=>x.sinHorario).length,enCurso:l.some(x=>x.enCurso)}}
-function filtraMaq(f){return MAQUINAS.filter(m=>(!f.area||m.planta===f.area)&&(!f.linea||m.zona===f.linea)&&(!f.maq||m.id===f.maq))}
+function filtraMaq(f){return MAQ_TODAS.filter(m=>(m.vigente||REG.some(r=>r.equipo===m.id))&&(!f.area||m.area===f.area)&&(!f.linea||m.lineaNom===f.linea)&&(!f.maq||m.id===f.maq))}
 function calcular(a,b,f,now){now=now||Date.now();const maqs=filtraMaq(f).map(m=>calcMaq(m,a,b,now));
-  const areas=[...new Set(maqs.map(x=>x.m.planta))].map(ar=>{const ms_=maqs.filter(x=>x.m.planta===ar);const lineas=[...new Set(ms_.map(x=>x.m.zona))].map(li=>{const l=ms_.filter(x=>x.m.zona===li);return {linea:li,maqs:l,t:agregar(l)}});return {area:ar,lineas,maqs:ms_,t:agregar(ms_)}});
+  const areas=[...new Set(maqs.map(x=>x.m.area))].map(ar=>{const ms_=maqs.filter(x=>x.m.area===ar);const lineas=[...new Set(ms_.map(x=>x.m.lineaNom))].map(li=>{const l=ms_.filter(x=>x.m.lineaNom===li);return {linea:li,maqs:l,t:agregar(l)}});return {area:ar,lineas,maqs:ms_,t:agregar(ms_)}});
   return {a,b,now,maqs,areas,t:agregar(maqs)}}
 function mecanicos(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{if(!r.atendidoPor)return;const k=r.atendidoPor;const o=g[k]||(g[k]={nombre:k,n:0,resp:[],rep:[],paros:0});o.n++;const t=tiempos(r);if(t.resp!=null&&t.resp>=0)o.resp.push(t.resp);if(t.rep!=null&&t.rep>=0)o.rep.push(t.rep);if(lineaDetenida(r)==='Detenida')o.paros++}));return Object.values(g).sort((a,b)=>b.n-a.n)}
 function causas(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{const k=r.tipoFalla||'Sin clasificar';const o=g[k]||(g[k]={tipo:k,n:0,ints:[]});o.n++;const i=intParo(r,D.now);if(i)o.ints.push([Math.max(i[0],D.a),Math.min(i[1],Math.min(D.b,D.now))])}));return Object.values(g).map(o=>Object.assign(o,{perdido:largo(unir(o.ints))})).sort((a,b)=>b.n-a.n||b.perdido-a.perdido)}
@@ -1066,17 +1105,17 @@ function filaSem(nivel,nombre,t,extra){return `<tr class="niv${nivel} s-${t.sem|
 function opts(l,sel,todos){return `<option value="">${todos}</option>`+l.map(x=>`<option value="${esc(x[0])}" ${x[0]===sel?'selected':''}>${esc(x[1])}</option>`).join('')}
 V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea,maq:EJ.maq};const D=calcular(P.a,P.b,f,now),T=D.t,pv=previo(P),A=pv?calcular(pv.a,pv.b,f,now).t:null;
   const sem=semanasHasta(Math.min(P.b-1,now),8,f,now),mec=mecanicos(D),cau=causas(D),rep=repetitivas(D),top=D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).slice(0,5);
-  const lineasDisp=[...new Set(MAQUINAS.filter(m=>!EJ.area||m.planta===EJ.area).map(m=>m.zona))],maqDisp=MAQUINAS.filter(m=>(!EJ.area||m.planta===EJ.area)&&(!EJ.linea||m.zona===EJ.linea));
-  const nom=m=>m.nombre+' · '+m.planta+' · '+m.zona,sinH=D.maqs.filter(x=>x.sinHorario);
+  const lineasDisp=[...new Set(MAQUINAS.filter(m=>!EJ.area||m.area===EJ.area).map(m=>m.lineaNom))],maqDisp=MAQUINAS.filter(m=>(!EJ.area||m.area===EJ.area)&&(!EJ.linea||m.lineaNom===EJ.linea));
+  const nom=m=>m.nombre+' · '+m.area+' · '+m.lineaNom,sinH=D.maqs.filter(x=>x.sinHorario);
   return `<div class="card ejf"><h2>📊 Tablero ejecutivo de mantenimiento</h2><p class="muted" style="margin:-4px 0 10px">${esc(P.txt)} · ${rangoTxt(P.a,Math.min(P.b,now+1))}${pv?' · comparado con '+rangoTxt(pv.a,pv.b+1):''}</p>
   <div class="filtros"><div><label for="ej_per">Periodo</label><select id="ej_per">${[['semana','Esta semana'],['anterior','Semana anterior'],['7d','Últimos 7 días'],['sem','Elegir una semana'],['rango','Rango de fechas'],['todo','Historial completo']].map(o=>`<option value="${o[0]}" ${EJ.per===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
   ${EJ.per==='sem'?`<div><label for="ej_dia">Cualquier día de la semana</label><input id="ej_dia" type="date" value="${esc(EJ.dia||hoy())}"></div>`:''}
   ${EJ.per==='rango'?`<div><label for="ej_des">Desde</label><input id="ej_des" type="date" value="${esc(EJ.desde||iso(new Date(inicioSemana(now))))}"></div><div><label for="ej_has">Hasta</label><input id="ej_has" type="date" value="${esc(EJ.hasta||hoy())}"></div>`:''}
-  <div><label for="ej_area">Área</label><select id="ej_area">${opts(PLANTAS.filter(p=>maquinasDe(p).length).map(p=>[p,p]),EJ.area,'Todas las áreas')}</select></div>
+  <div><label for="ej_area">Área</label><select id="ej_area">${opts([...new Set(MAQUINAS.map(m=>m.area))].map(p=>[p,p]),EJ.area,'Todas las áreas')}</select></div>
   <div><label for="ej_lin">Línea</label><select id="ej_lin">${opts(lineasDisp.map(l=>[l,l]),EJ.linea,'Todas las líneas')}</select></div>
   <div><label for="ej_maq">Máquina</label><select id="ej_maq">${opts(maqDisp.map(m=>[m.id,nom(m)]),EJ.maq,'Todas las máquinas')}</select></div></div>
   <div class="acciones"><button id="xlsPer">📥 Excel del periodo</button><button class="sec" id="xls7">📥 Últimos 7 días</button><button class="sec" id="xlsTodo">📥 Historial completo</button></div><div id="xlsMsg"></div></div>
-  ${sinH.length?`<div class="aviso">⚠️ ${sinH.map(x=>esc(x.m.zona+' ('+x.m.planta+')')).join(', ')} no tiene${sinH.length>1?'n':''} horario programado, así que su disponibilidad aparece como N/D. ${esAdmin()?'Configúralo en <b>Máquinas → Ficha técnica → Horario programado</b>.':'El Administrador principal o el Supervisor de mantenimiento lo configuran en la ficha de la máquina.'}</div>`:''}
+  ${sinH.length?`<div class="aviso">⚠️ ${sinH.map(x=>esc(x.m.lineaNom+' ('+x.m.area+')')).join(', ')} no tiene${sinH.length>1?'n':''} horario programado, así que su disponibilidad aparece como N/D. ${esAdmin()?'Configúralo en <b>Máquinas → Ficha técnica → Horario programado</b>.':'El Administrador principal o el Supervisor de mantenimiento lo configuran en la ficha de la máquina.'}</div>`:''}
   <div class="grid">${kpiE(durN(T.perdido),'Tiempo total de paro (producción perdida)',delta(T.perdido,A&&A.perdido,true,durMin),T.enCurso?'kbad':'')}
   ${kpiE(T.veces,'Paros reales (veces que se detuvo)',delta(T.veces,A&&A.veces,true,x=>String(x)))}
   ${kpiE(T.nf,'Reportes de falla',delta(T.nf,A&&A.nf,true,x=>String(x)))}
@@ -1089,15 +1128,15 @@ V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea
   ${D.areas.length>1?filaSem(0,'<b>Total</b>',T):''}</tbody></table></div></div>
   <div class="grid2"><div class="card"><h2>Tiempo perdido por área</h2>${hbar(D.areas.map(x=>({l:x.area,v:x.t.perdido,c:x.t.sem})),durMin)}</div>
   <div class="card"><h2>Tiempo perdido por línea</h2>${hbar([].concat(...D.areas.map(ar=>ar.lineas.map(li=>({l:li.linea+(D.areas.length>1?' · '+ar.area:''),v:li.t.perdido,c:li.t.sem})))),durMin)}</div>
-  <div class="card"><h2>Tiempo perdido por máquina</h2>${hbar(D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).map(x=>({l:x.m.zona+' · '+x.m.nombre,v:x.perdido,c:x.sem})),durMin)}</div>
-  <div class="card"><h2>Máquinas con más fallas</h2>${hbar(D.maqs.slice().sort((x,y)=>y.nf-x.nf).map(x=>({l:x.m.zona+' · '+x.m.nombre,v:x.nf})),v=>v+(v===1?' falla':' fallas'))}</div>
+  <div class="card"><h2>Tiempo perdido por máquina</h2>${hbar(D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).map(x=>({l:x.m.lineaNom+' · '+x.m.nombre,v:x.perdido,c:x.sem})),durMin)}</div>
+  <div class="card"><h2>Máquinas con más fallas</h2>${hbar(D.maqs.slice().sort((x,y)=>y.nf-x.nf).map(x=>({l:x.m.lineaNom+' · '+x.m.nombre,v:x.nf})),v=>v+(v===1?' falla':' fallas'))}</div>
   <div class="card"><h2>Principales causas de falla</h2>${hbar(cau.slice(0,8).map(c=>({l:c.tipo,v:c.n})),v=>v+(v===1?' falla':' fallas'))}</div>
   </div><div class="card"><h2>Comparación con el periodo anterior</h2>${A?`<div class="scroll"><table><thead><tr><th></th><th>Anterior</th><th>Actual</th><th>Resultado</th></tr></thead><tbody>
     ${[['Horas de paro',h1(A.perdido)+' h',h1(T.perdido)+' h',delta(T.perdido,A.perdido,true,durMin)],['Fallas',A.nf,T.nf,delta(T.nf,A.nf,true,String)],['Paros reales',A.veces,T.veces,delta(T.veces,A.veces,true,String)],['Disponibilidad',pct(A.disp),pct(T.disp),delta(T.disp,A.disp,false,x=>(Math.round(x*1000)/10)+' pts')],['Respuesta prom.',durN(prom(A.resp)),durN(prom(T.resp)),delta(prom(T.resp),prom(A.resp),true,durMin)]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num"><b>${r[2]}</b></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">El historial completo no tiene periodo anterior para comparar.</p>'}</div>
   <div class="card"><h2>Evolución semanal (últimas ${sem.length} semanas)</h2>${lineaSVG(sem)}</div>
-  <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.zona)}</b> <small class="muted">${esc(x.m.planta)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s) ${pillSem(x.sem)}</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
+  <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.lineaNom)}</b> <small class="muted">${esc(x.m.area)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s) ${pillSem(x.sem)}</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
   <div class="card"><h2>Intervenciones por mecánico</h2>${mec.length?`<div class="scroll"><table><thead><tr><th>Mecánico</th><th>Intervenciones</th><th>Resp. prom.</th><th>Reparación prom.</th></tr></thead><tbody>${mec.map(x=>`<tr><td>${esc(x.nombre)}</td><td class="num">${x.n}</td><td class="num">${durN(prom(x.resp))}</td><td class="num">${durN(prom(x.rep))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Sin intervenciones en el periodo.</p>'}</div></div>
-  <div class="card"><h2>🔁 Fallas repetitivas</h2>${rep.length?`<div class="scroll"><table><thead><tr><th>Máquina</th><th>Tipo de falla</th><th>Veces</th><th>Tiempo perdido</th><th>Mecánicos</th><th>Refacciones</th></tr></thead><tbody>${rep.map(o=>`<tr class="${o.n>=3?'s-rojo':'s-amarillo'}"><td>${esc(o.m.nombre+' · '+o.m.zona)}</td><td>${esc(o.tipo)}</td><td class="num"><b>${o.n}</b></td><td class="num">${o.perdido?durMin(o.perdido):'0 min'}</td><td>${esc(o.mecTxt)}</td><td><small>${esc(o.refTxt)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No hay fallas que se repitan (mismo tipo en la misma máquina) en el periodo.</p>'}</div>
+  <div class="card"><h2>🔁 Fallas repetitivas</h2>${rep.length?`<div class="scroll"><table><thead><tr><th>Máquina</th><th>Tipo de falla</th><th>Veces</th><th>Tiempo perdido</th><th>Mecánicos</th><th>Refacciones</th></tr></thead><tbody>${rep.map(o=>`<tr class="${o.n>=3?'s-rojo':'s-amarillo'}"><td>${esc(o.m.nombre+' · '+o.m.lineaNom)}</td><td>${esc(o.tipo)}</td><td class="num"><b>${o.n}</b></td><td class="num">${o.perdido?durMin(o.perdido):'0 min'}</td><td>${esc(o.mecTxt)}</td><td><small>${esc(o.refTxt)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No hay fallas que se repitan (mismo tipo en la misma máquina) en el periodo.</p>'}</div>
   <p class="muted"><small>Tiempo de respuesta: del reporte a que el mecánico empieza. Reparación: de que empieza a que termina. Paro: del reporte a que la línea vuelve a producir; si hay reportes al mismo tiempo en una máquina, el tiempo se cuenta una sola vez. Las fallas que no detuvieron la línea cuentan como reportes, pero no como tiempo perdido. N/D = dato no disponible.</small></p>`};
 function enlazarEjecutivo(){if(vista!=='ejecutivo')return;
   const on=(id,k)=>{const e=$(id);if(e)e.onchange=()=>{EJ[k]=e.value;if(k==='area'){EJ.linea='';EJ.maq=''}if(k==='linea')EJ.maq='';render(true)}};
@@ -1130,7 +1169,7 @@ async function descargarExcel(P,f){
   const ref=(ws,c1,r1,c2,r2)=>`'${ws.name}'!$${colL(c1)}$${r1}:$${colL(c2)}$${r2}`;
   const sub=`${P.txt} · ${rangoTxt(P.a,Math.min(P.b,now+1))}${f.area||f.linea||f.maq?' · Filtro: '+[f.area,f.linea,f.maq&&maq(f.maq)?maq(f.maq).nombre:''].filter(Boolean).join(' / '):''} · Generado ${fLarga(now)} ${hhmm(now)} por ${perfil.nombre}`;
   const H='0.00',M='0.0',PC='0.0%',FE='dd/mm/yyyy',HO='hh:mm';
-  const nomM=m=>m.nombre+' · '+m.planta+' · '+m.zona;
+  const nomM=m=>m.nombre+' · '+m.area+' · '+m.lineaNom;
 
   // 1. Resumen ejecutivo
   let ws=hoja('Resumen ejecutivo',[44,18,18,16,18,4,30,14,14,16]);titulo(ws,'Reporte ejecutivo de mantenimiento · La Josefina',sub,10);
@@ -1150,8 +1189,8 @@ async function descargarExcel(P,f){
   // Top 5 y fallas más frecuentes (a la derecha)
   encab(ws,4,['Top 5 · mayor tiempo de paro','Horas de paro','Paros','Semáforo'],null,7);
   const top=D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).slice(0,5);
-  top.forEach((x,i)=>{const row=ws.getRow(5+i);[[7,x.m.nombre+' · '+x.m.zona+' ('+x.m.planta+')'],[8,h1(x.perdido)],[9,x.veces]].forEach(([c,v])=>{const k=row.getCell(c);k.value=v;k.border=borde;if(c===8)k.numFmt=H});pintaSem(row.getCell(10),x.sem);row.getCell(10).border=borde});
-  if(top.length)graficas.push({ws,tipo:'bar',titulo:'Top 5 · horas de paro por máquina',cat:{ref:ref(ws,7,5,7,4+top.length),vals:top.map(x=>x.m.nombre+' · '+x.m.zona)},series:[{nombre:'Horas de paro',ref:ref(ws,8,5,8,4+top.length),vals:top.map(x=>h1(x.perdido)),color:'1D4F9C',colores:top.map(x=>x.sem?XSEM[x.sem].g:'1D4F9C')}],desde:[6,11],hasta:[10,27]});
+  top.forEach((x,i)=>{const row=ws.getRow(5+i);[[7,x.m.nombre+' · '+x.m.lineaNom+' ('+x.m.area+')'],[8,h1(x.perdido)],[9,x.veces]].forEach(([c,v])=>{const k=row.getCell(c);k.value=v;k.border=borde;if(c===8)k.numFmt=H});pintaSem(row.getCell(10),x.sem);row.getCell(10).border=borde});
+  if(top.length)graficas.push({ws,tipo:'bar',titulo:'Top 5 · horas de paro por máquina',cat:{ref:ref(ws,7,5,7,4+top.length),vals:top.map(x=>x.m.nombre+' · '+x.m.lineaNom)},series:[{nombre:'Horas de paro',ref:ref(ws,8,5,8,4+top.length),vals:top.map(x=>h1(x.perdido)),color:'1D4F9C',colores:top.map(x=>x.sem?XSEM[x.sem].g:'1D4F9C')}],desde:[6,11],hasta:[10,27]});
   const cau=causas(D);const r0=29;encab(ws,r0,['Fallas más frecuentes (tipo)','Veces','Horas de paro'],null,7);
   cau.slice(0,8).forEach((c,i)=>{const row=ws.getRow(r0+1+i);[[7,c.tipo],[8,c.n],[9,h1(c.perdido)]].forEach(([k,v])=>{const z=row.getCell(k);z.value=v;z.border=borde;if(k===9)z.numFmt=H})});
   if(cau.length)graficas.push({ws,tipo:'bar',titulo:'Fallas más frecuentes',cat:{ref:ref(ws,7,r0+1,7,r0+Math.min(8,cau.length)),vals:cau.slice(0,8).map(c=>c.tipo)},series:[{nombre:'Fallas',ref:ref(ws,8,r0+1,8,r0+Math.min(8,cau.length)),vals:cau.slice(0,8).map(c=>c.n),color:'C8102E'}],desde:[0,r0-1],hasta:[5,r0+16]});
@@ -1176,7 +1215,7 @@ async function descargarExcel(P,f){
   ws=hoja('Desglose por máquina',[30,13,13,30,22,24,18,13,13,13,30,11,34,12,16,14],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Desglose por máquina · toca el botón + de la izquierda para ver cada reporte',sub,16);
   encab(ws,4,['Máquina','Área','Línea','Horas programadas','Horas de paro','Veces que se detuvo','Reportes levantados','Resp. prom. (min)','Rep. prom. (min)','Disponibilidad','Semáforo','Turnos QR (h)','Reportes con paro','Sin hora de reanudación','Otros trabajos','Fallas cerradas']);
   r=5;
-  D.maqs.forEach(x=>{const row=fila(ws,r,[nomM(x.m),x.m.planta,x.m.zona,h1(x.prog),h1(x.perdido),x.veces,x.nf,m1(prom(x.resp)),m1(prom(x.rep)),x.disp,'',h1(x.turnoH),x.paros,x.sinFin,x.trabajos,x.resueltas],[null,null,null,H,H,'0','0',M,M,PC,null,H,'0','0','0','0']);
+  D.maqs.forEach(x=>{const row=fila(ws,r,[nomM(x.m),x.m.area,x.m.lineaNom,h1(x.prog),h1(x.perdido),x.veces,x.nf,m1(prom(x.resp)),m1(prom(x.rep)),x.disp,'',h1(x.turnoH),x.paros,x.sinFin,x.trabajos,x.resueltas],[null,null,null,H,H,'0','0',M,M,PC,null,H,'0','0','0','0']);
     row.eachCell(c=>{c.font=Object.assign({},c.font||{},{bold:true});c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azulS}}});pintaSem(row.getCell(11),x.sem);row.getCell(11).border=borde;row.height=22;resumenes[ws._n]=(resumenes[ws._n]||[]).concat(r);r++;
     const regs=x.regs.slice().sort((p,q)=>msReg(p)-msReg(q));
     const h=encab(ws,r,['Fecha','Hora del reporte','Tipo','Descripción del problema','Tipo de falla','Causa de la falla','Mecánico que atendió','Respuesta (min)','Reparación (min)','Paro real (min)','Refacciones utilizadas','Cantidad','Trabajo realizado','Hora de solución','¿Línea detenida?','Estado'],'FF5B6B7E');h.outlineLevel=1;h.hidden=true;h.height=30;r++;
@@ -1191,7 +1230,7 @@ async function descargarExcel(P,f){
   const cols=['Fecha','Hora','Máquina','Área','Línea','Tipo','Descripción','Tipo de falla','Causa','Mecánico / responsable','Respuesta (min)','Reparación (min)','Paro real (min)','Paro contado (min)','Refacciones','Trabajo realizado','Hora solución','¿Línea detenida?','Estado','Reportó','Confirmó'];encab(ws,4,cols);
   const todos=[].concat(...D.maqs.map(x=>x.regs.map(rg=>({x,rg})))).sort((p,q)=>msReg(p.rg)-msReg(q.rg));r=5;
   todos.forEach(({x,rg})=>{const t=tiempos(rg),ip=intParo(rg,now);let cont=null;if(ip){const a=Math.max(ip[0],P.a),b=Math.min(ip[1],fin);cont=b>a?m1(b-a):0}
-    fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),x.m.nombre+' · '+x.m.zona,x.m.planta,x.m.zona,esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',rg.tipoFalla||'—',rg.causa||null,rg.atendidoPor||rg.tecnico||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),ip?cont:(lineaDetenida(rg)==='Detenida'?null:0),refsDe(rg).map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad:z.nombre).join(', ')||'—',rg.trabajoRealizado||'—',ms(rg.finAtencion)?fechaX(ms(rg.finAtencion)):'—',lineaDetenida(rg),rg.estado||'',esFalla(rg)?rg.tecnico||'':'—',rg.confirmadoPor||'—'],[FE,HO,null,null,null,null,null,null,null,null,M,M,M,M,null,null,HO]);r++});
+    fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),x.m.nombre+' · '+x.m.lineaNom,x.m.area,x.m.lineaNom,esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',rg.tipoFalla||'—',rg.causa||null,rg.atendidoPor||rg.tecnico||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),ip?cont:(lineaDetenida(rg)==='Detenida'?null:0),refsDe(rg).map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad:z.nombre).join(', ')||'—',rg.trabajoRealizado||'—',ms(rg.finAtencion)?fechaX(ms(rg.finAtencion)):'—',lineaDetenida(rg),rg.estado||'',esFalla(rg)?rg.tecnico||'':'—',rg.confirmadoPor||'—'],[FE,HO,null,null,null,null,null,null,null,null,M,M,M,M,null,null,HO]);r++});
   if(todos.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+todos.length,column:cols.length}};else fila(ws,5,['Sin intervenciones en el periodo']);
   if(todos.length){const rr=r+1;ws.getCell(rr,13).value='Total (min)';ws.getCell(rr,13).font={bold:true};ws.getCell(rr,14).value={formula:`SUBTOTAL(9,N5:N${r-1})`};ws.getCell(rr,14).numFmt=M;ws.getCell(rr,14).font={bold:true}}
   ws.views=[{showGridLines:false,state:'frozen',ySplit:4}];
@@ -1206,14 +1245,14 @@ async function descargarExcel(P,f){
   // 6. Fallas repetitivas
   const rep=repetitivas(D);ws=hoja('Fallas repetitivas',[30,14,12,28,14,16,30,40],{});titulo(ws,'Fallas repetitivas (mismo tipo de falla en la misma máquina, 2 veces o más)',sub,8);
   encab(ws,4,['Máquina','Área','Línea','Tipo de falla','Repeticiones','Tiempo perdido (h)','Mecánicos','Refacciones utilizadas']);
-  rep.forEach((o,i)=>{const row=fila(ws,5+i,[o.m.nombre+' · '+o.m.zona,o.m.planta,o.m.zona,o.tipo,o.n,h1(o.perdido),o.mecTxt,o.refTxt],[null,null,null,null,'0',H]);const s=o.n>=3?'rojo':'amarillo';row.getCell(5).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM[s].f}};row.getCell(5).font={bold:true,color:{argb:XSEM[s].t}}});
+  rep.forEach((o,i)=>{const row=fila(ws,5+i,[o.m.nombre+' · '+o.m.lineaNom,o.m.area,o.m.lineaNom,o.tipo,o.n,h1(o.perdido),o.mecTxt,o.refTxt],[null,null,null,null,'0',H]);const s=o.n>=3?'rojo':'amarillo';row.getCell(5).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM[s].f}};row.getCell(5).font={bold:true,color:{argb:XSEM[s].t}}});
   if(rep.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+rep.length,column:8}};else fila(ws,5,['No hay fallas repetitivas en el periodo']);
 
   // 7. Refacciones
   ws=hoja('Refacciones',[30,14,12,10,30,14,12,12,24,16,16],{});titulo(ws,'Refacciones utilizadas en el periodo',sub,11);
   encab(ws,4,['Refacción','Código','Cantidad','Unidad','Máquina','Área','Línea','Fecha','Mecánico responsable','Costo unitario','Costo total']);r=5;
   todos.forEach(({x,rg})=>refsDe(rg).forEach(z=>{const inv=z.id&&REF.find(y=>y.id===z.id),cu=inv&&Number(inv.costo)>0?Number(inv.costo):null;
-    const row=fila(ws,r,[z.nombre,z.codigo||'',z.cantidad,z.unidad||'',x.m.nombre+' · '+x.m.zona,x.m.planta,x.m.zona,fechaX(msReg(rg)),rg.atendidoPor||rg.tecnico||'',cu==null?'':cu,''],[null,null,'0.##',null,null,null,null,FE,null,'"$"#,##0.00']);
+    const row=fila(ws,r,[z.nombre,z.codigo||'',z.cantidad,z.unidad||'',x.m.nombre+' · '+x.m.lineaNom,x.m.area,x.m.lineaNom,fechaX(msReg(rg)),rg.atendidoPor||rg.tecnico||'',cu==null?'':cu,''],[null,null,'0.##',null,null,null,null,FE,null,'"$"#,##0.00']);
     row.getCell(11).value={formula:`IF(OR(J${r}="",ISTEXT(C${r})),"",C${r}*J${r})`};row.getCell(11).numFmt='"$"#,##0.00';r++}));
   if(r>5){ws.autoFilter={from:{row:4,column:1},to:{row:r-1,column:11}};const row=ws.getRow(r+1);row.getCell(10).value='Costo total';row.getCell(10).font={bold:true};row.getCell(11).value={formula:`SUBTOTAL(9,K5:K${r-1})`};row.getCell(11).numFmt='"$"#,##0.00';row.getCell(11).font={bold:true};
     ws.getCell(r+3,1).value='Escribe el costo unitario en la columna J (o regístralo en el inventario de la plataforma) y el costo total se calcula solo.';ws.getCell(r+3,1).font={italic:true,size:9,color:{argb:'FF55606B'}}}else fila(ws,5,['Sin refacciones registradas en el periodo']);
@@ -1232,7 +1271,7 @@ async function descargarExcel(P,f){
   ws=hoja('Turnos (QR)',[12,30,12,12,24,16,10,10,10,28,40],{});titulo(ws,'Turnos registrados con el código QR (evidencia de operación)',sub,11);
   encab(ws,4,['Fecha','Máquina','Área','Línea','Operadora','Turno','Inicio','Fin','Horas','Cierre','Correcciones']);
   const ids=new Set(D.maqs.map(x=>x.m.id)),tur=TURNOS.filter(t=>ids.has(t.equipo)&&ms(t.inicio)>=P.a&&ms(t.inicio)<P.b).sort((p,q)=>ms(p.inicio)-ms(q.inicio));
-  tur.forEach((t,i)=>{const m=maq(t.equipo)||{nombre:t.equipo,zona:t.linea||'',planta:t.planta||''},a=ms(t.inicio),b=ms(t.fin);fila(ws,5+i,[fechaX(a),m.nombre+' · '+m.zona,m.planta,m.zona,t.operador||'',t.turno||'',fechaX(a),b?fechaX(b):(t.estado==='Abierto'?'En curso':null),b?h1(b-a):null,t.estado==='Abierto'?'Abierto':(t.cierre||'Operadora'),(t.historial||[]).map(hh=>new Date(hh.en).toLocaleString('es-MX')+' · '+hh.por+': '+hh.motivo).join(' | ')||'—'],[FE,null,null,null,null,null,HO,HO,H])});
+  tur.forEach((t,i)=>{const m=maq(t.equipo)||{nombre:t.equipo,lineaNom:t.linea||'',area:t.planta||''},a=ms(t.inicio),b=ms(t.fin);fila(ws,5+i,[fechaX(a),m.nombre+' · '+m.lineaNom,m.area,m.lineaNom,t.operador||'',t.turno||'',fechaX(a),b?fechaX(b):(t.estado==='Abierto'?'En curso':null),b?h1(b-a):null,t.estado==='Abierto'?'Abierto':(t.cierre||'Operadora'),(t.historial||[]).map(hh=>new Date(hh.en).toLocaleString('es-MX')+' · '+hh.por+': '+hh.motivo).join(' | ')||'—'],[FE,null,null,null,null,null,HO,HO,H])});
   if(tur.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+tur.length,column:11}};else fila(ws,5,['Sin turnos registrados en el periodo']);
   ws.getCell(6+tur.length,1).value='Los turnos con QR son evidencia; la disponibilidad se calcula con el horario programado de cada máquina para que olvidar iniciar o finalizar un turno no altere los indicadores.';ws.getCell(6+tur.length,1).font={italic:true,size:9,color:{argb:'FF55606B'}};
 
@@ -1286,8 +1325,8 @@ function miTurnoAbierto(){return usuario?TURNOS.find(t=>t.operadorUid===usuario.
 function txtTurno(t){return t?`${esc(t.nombre)} (${hhmm(t.a)}–${hhmm(t.b)})`:'Fuera del horario programado'}
 function tarjetaTurno(){if(!puedeTurno())return '';const ab=miTurnoAbierto();const eq=maqFija||(misLineas()&&misLineas().length===1?misLineas()[0]:null);
   if(ab){const m=maq(ab.equipo)||{zona:ab.equipo,planta:''};return `<div class="card turno abierto"><p style="margin:0 0 8px"><b>🟢 Turno en curso</b> · ${esc(m.planta+' · '+m.zona)} · ${esc(ab.turno||'')} desde las ${hhmm(ms(ab.inicio))}</p>${eq&&eq!==ab.equipo?'<p class="muted" style="margin:0 0 8px">Para iniciar turno en otra máquina, primero finaliza este.</p>':''}<button class="xl sec" id="finTurno" data-id="${esc(ab.id)}">⏹ FINALIZAR TURNO</button></div>`}
-  if(!eq)return '';const m=maq(eq),t=turnoEn(eq,Date.now());
-  return `<div class="card turno"><p style="margin:0 0 8px"><b>${esc(m.nombre)} · ${esc(m.zona)}</b><br><small class="muted">${horario(eq)?txtTurno(t):'Esta máquina aún no tiene horario configurado'}</small></p><button class="xl" id="iniTurno" data-eq="${esc(eq)}">▶ INICIAR TURNO</button></div>`}
+  const m=eq&&maq(eq);if(!m)return '';const t=turnoEn(eq,Date.now());
+  return `<div class="card turno"><p style="margin:0 0 8px"><b>${esc(m.nombre)} · ${esc(m.lineaNom)}</b><br><small class="muted">${horario(eq)?txtTurno(t):'Esta máquina aún no tiene horario configurado'}</small></p><button class="xl" id="iniTurno" data-eq="${esc(eq)}">▶ INICIAR TURNO</button></div>`}
 async function iniciarTurno(eq){const m=maq(eq),now=Date.now(),t=turnoEn(eq,now),nombre=t?t.nombre:'Fuera de horario',fecha=t?iso(new Date(t.a)):hoy();
   const id=[usuario.uid,eq,fecha,nombre].join('_').replace(/[^\w-]/g,'-');
   if(TURNOS.some(x=>x.id===id))throw new Error('Ya registraste el '+nombre.toLowerCase()+' de hoy en esta máquina. Si fue un error, pide al supervisor que lo corrija.');
@@ -1331,8 +1370,126 @@ function enlazarTurnos(){
         await db.collection('turnos').doc(t.id).update({inicio:ini,fin:fi||null,estado:fi?'Cerrado':'Abierto',cierre:fi?'Corregido por '+perfil.nombre:(t.cierre||''),historial:(t.historial||[]).concat([ent])})}
       corrTurno=null;toast('Corrección guardada en el historial.');render(true)}catch(e){$('tErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}}}
 
+// ===== Plantas y máquinas (solo Administrador principal) =====
+let catEdit=null; // {tipo:'planta'|'linea'|'maquina', id, padre}
+let verBajas=false;
+function formCat(){const e=catEdit;if(!e)return '';
+  if(e.tipo==='planta'){const p=e.id?PLANTAS_TODAS.find(x=>x.id===e.id):{};return `<form id="fCat" class="card catform"><h3>${e.id?'Editar planta':'Agregar planta'}</h3><label for="c_nom">Nombre de la planta</label><input id="c_nom" required maxlength="60" value="${esc(p.nombre||'')}" placeholder="Ej. CIC">
+    <div class="acciones"><button type="submit">Guardar</button><button type="button" class="sec" id="cancelCat">Cancelar</button></div><div id="cErr2"></div></form>`}
+  if(e.tipo==='linea'){const l=e.id?LINEAS_TODAS.find(x=>x.id===e.id):{planta:e.padre};return `<form id="fCat" class="card catform"><h3>${e.id?'Editar línea':'Agregar línea en '+esc(e.padre)}</h3>
+    <div class="dos"><div><label for="c_nom">Nombre de la línea</label><input id="c_nom" required maxlength="60" value="${esc(l.nombre||'')}" placeholder="Ej. Línea A, RL Pack, GA Pack"></div>
+    <div><label for="c_pla">Planta</label><select id="c_pla">${PLANTAS.map(p=>`<option ${p===l.planta?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
+    <label for="c_area">Área <small class="muted">(opcional; si la dejas vacía, el área es la planta)</small></label><input id="c_area" maxlength="60" value="${esc(l.area&&l.area!==l.planta?l.area:'')}" placeholder="Ej. AM Pack">
+    <div class="acciones"><button type="submit">Guardar</button><button type="button" class="sec" id="cancelCat">Cancelar</button></div><div id="cErr2"></div></form>`}
+  const m=e.id?maq(e.id):{linea:e.padre};return `<form id="fCat" class="card catform"><h3>${e.id?'Editar máquina':'Agregar máquina'}</h3>
+    <div class="dos"><div><label for="c_nom">Nombre de la máquina</label><input id="c_nom" required maxlength="60" value="${esc(m.nombre||'')}" placeholder="Ej. Envasadora vertical, Detector de metales"></div>
+    <div><label for="c_cod">Código de equipo</label><input id="c_cod" maxlength="30" value="${esc(m.codigo||'')}" placeholder="Ej. EQ A005" ${e.id?'':''}></div></div>
+    <div class="dos"><div><label for="c_lin">Línea</label><select id="c_lin">${LINEAS.map(l=>`<option value="${esc(l.id)}" ${l.id===m.linea?'selected':''}>${esc(l.planta+' · '+l.nombre)}</option>`).join('')}</select></div>
+    <div><label for="c_inc">Incluye <small class="muted">(opcional)</small></label><input id="c_inc" maxlength="120" value="${esc(m.incluye||'')}" placeholder="Ej. Báscula y codificador"></div></div>
+    <p class="muted" style="margin:8px 0 0">Cada máquina tiene su propio código QR. Los equipos que van juntos (báscula, codificador) se anotan en «Incluye» para no darlos de alta por separado.</p>
+    <div class="acciones"><button type="submit">Guardar</button><button type="button" class="sec" id="cancelCat">Cancelar</button></div><div id="cErr2"></div></form>`}
+function abiertasDe(ids){return REG.filter(r=>ids.includes(r.equipo)&&esFalla(r)&&abierto(r)).length}
+V.catalogo=()=>{const bajasP=PLANTAS_TODAS.filter(p=>p.activo===false),bajasL=LINEAS_TODAS.filter(l=>l.activo===false&&PLANTAS.includes(l.planta)),bajasM=MAQ_TODAS.filter(m=>m.activo===false);
+  const nb=bajasP.length+bajasL.length+bajasM.length;
+  return `<div class="card"><h2>🏭 Plantas y máquinas</h2><p class="muted" style="margin-top:-4px">Planta → línea → máquina. «Dar de baja» la quita de las listas, pero conserva su historial y sus reportes.</p>
+  <div class="acciones" style="margin-top:0"><button id="catAddP">+ Agregar planta</button>${nb?`<button class="sec" id="catBajas">${verBajas?'Ocultar':'Ver'} dados de baja (${nb})</button>`:''}</div></div>
+  ${catEdit&&catEdit.tipo==='planta'&&!catEdit.id?formCat():''}
+  ${PLANTAS_TODAS.filter(p=>p.activo!==false).map(p=>{const ls=LINEAS.filter(l=>l.planta===p.nombre);return `<div class="card catpl"><div class="cathead"><h2>${esc(p.nombre)} <small class="muted">${ls.length} línea${ls.length===1?'':'s'} · ${(n=>n+(n===1?' máquina':' máquinas'))(MAQUINAS.filter(m=>m.planta===p.nombre).length)}</small></h2>
+    <div class="acciones" style="margin:0"><button class="mini sec" data-cat="edit-planta" data-id="${esc(p.id)}">Editar</button><button class="mini peligro" data-cat="baja-planta" data-id="${esc(p.id)}">Dar de baja</button></div></div>
+    ${catEdit&&catEdit.tipo==='planta'&&catEdit.id===p.id?formCat():''}
+    ${ls.map(l=>{const ms_=MAQUINAS.filter(m=>m.linea===l.id);return `<div class="catlin"><div class="cathead"><h3>${esc(l.nombre)}${l.area&&l.area!==l.planta?` <small class="muted">Área ${esc(l.area)}</small>`:''}</h3>
+      <div class="acciones" style="margin:0"><button class="mini sec" data-cat="edit-linea" data-id="${esc(l.id)}">Editar</button><button class="mini peligro" data-cat="baja-linea" data-id="${esc(l.id)}">Dar de baja</button></div></div>
+      ${catEdit&&catEdit.tipo==='linea'&&catEdit.id===l.id?formCat():''}
+      ${ms_.length?ms_.map(m=>`<div class="item catmaq"><div><b>${esc(m.nombre)}</b>${m.codigo?` <span class="tag neu">${esc(m.codigo)}</span>`:''}${m.incluye?`<br><small class="muted">Incluye: ${esc(m.incluye)}</small>`:''}${horario(m.id)?'':'<br><small class="muted">⚠️ Sin horario programado</small>'}</div>
+        <div class="acciones" style="margin:0"><button class="mini sec" data-ficha="${esc(m.id)}">QR y ficha</button><button class="mini sec" data-cat="edit-maquina" data-id="${esc(m.id)}">Editar</button><button class="mini peligro" data-cat="baja-maquina" data-id="${esc(m.id)}">Dar de baja</button></div></div>${catEdit&&catEdit.tipo==='maquina'&&catEdit.id===m.id?formCat():''}`).join(''):'<p class="muted" style="margin:6px 0">Sin máquinas.</p>'}
+      ${catEdit&&catEdit.tipo==='maquina'&&!catEdit.id&&catEdit.padre===l.id?formCat():`<button class="mini" data-cat="add-maquina" data-id="${esc(l.id)}">+ Agregar máquina</button>`}</div>`}).join('')}
+    ${catEdit&&catEdit.tipo==='linea'&&!catEdit.id&&catEdit.padre===p.nombre?formCat():`<div class="acciones"><button class="sec" data-cat="add-linea" data-id="${esc(p.nombre)}">+ Agregar línea en ${esc(p.nombre)}</button></div>`}</div>`}).join('')}
+  ${verBajas&&nb?`<div class="card"><h2>Dados de baja</h2>${[...bajasP.map(p=>['planta',p.id,'Planta '+p.nombre]),...bajasL.map(l=>['linea',l.id,'Línea '+l.nombre+' · '+l.planta]),...bajasM.map(m=>['maquina',m.id,m.nombre+' · '+m.lineaNom+(m.planta?' · '+m.planta:'')])].map(([t,id,n])=>`<div class="item"><div>${esc(n)}</div><button class="mini sec" data-cat="alta-${t}" data-id="${esc(id)}">Reactivar</button></div>`).join('')}</div>`:''}`};
+async function guardarCat(ev){ev.preventDefault();const e=catEdit,f=$('fCat'),b=f.querySelector('button[type=submit]');b.disabled=true;$('cErr2').innerHTML='';const nom=$('c_nom').value.trim();
+  try{if(e.tipo==='planta'){if(PLANTAS_TODAS.some(p=>p.nombre.toLowerCase()===nom.toLowerCase()&&p.id!==e.id))throw new Error('Ya existe una planta con ese nombre.');
+      if(!e.id){await db.collection('plantas').doc(slug(nom)||('P-'+Date.now())).set({nombre:nom,activo:true,orden:PLANTAS_TODAS.length,creadoEn:TS()},{merge:true})}
+      else{const p=PLANTAS_TODAS.find(x=>x.id===e.id),antes=p.nombre;const batch=db.batch();batch.set(db.collection('plantas').doc(e.id),{nombre:nom,activo:true,orden:p.orden??0},{merge:true});
+        if(antes!==nom){LINEAS_TODAS.filter(l=>l.planta===antes).forEach(l=>batch.set(db.collection('lineas').doc(l.id),{nombre:l.nombre,planta:nom,area:l.area===antes?'':(l.area||''),activo:l.activo!==false},{merge:true}));
+          USUARIOS.filter(u=>u.planta===antes&&u.uid!==usuario.uid&&u.rol!==PRINCIPAL).forEach(u=>batch.update(db.collection('usuarios').doc(u.uid),{planta:nom}))}
+        await batch.commit()}}
+    else if(e.tipo==='linea'){const pla=$('c_pla').value,area=$('c_area').value.trim();if(LINEAS_TODAS.some(l=>l.planta===pla&&l.nombre.toLowerCase()===nom.toLowerCase()&&l.id!==e.id))throw new Error('Esa planta ya tiene una línea con ese nombre.');
+      const id=e.id||('L-'+slug(pla).slice(0,8)+'-'+slug(nom).slice(0,16)+'-'+Date.now().toString(36).slice(-4));await db.collection('lineas').doc(id).set({nombre:nom,planta:pla,area,activo:true},{merge:true})}
+    else{const lin=$('c_lin').value,cod=$('c_cod').value.trim();if(!lin)throw new Error('Primero agrega una línea.');
+      if(cod&&MAQ_TODAS.some(m=>m.codigo&&m.codigo.replace(/\s/g,'').toUpperCase()===cod.replace(/\s/g,'').toUpperCase()&&m.id!==e.id))throw new Error('Ese código ya está dado de alta en otra máquina.');
+      let id=e.id;if(!id){id=slug(cod)||('M-'+Date.now().toString(36).toUpperCase());while(maq(id))id+='-'+Math.floor(Math.random()*90+10)}
+      await db.collection('maquinas').doc(id).set({nombre:nom,codigo:cod,linea:lin,incluye:$('c_inc').value.trim(),activo:true},{merge:true})}
+    catEdit=null;toast('Guardado.');render(true)}catch(er){$('cErr2').innerHTML=`<p class="error">${esc(er.message||errTxt(er))}</p>`;b.disabled=false}}
+async function accionCat(acc,id){const [verbo,tipo]=acc.split('-');
+  if(verbo==='add'){catEdit={tipo,padre:id};render(true);return}
+  if(verbo==='edit'){catEdit={tipo,id};render(true);return}
+  const activo=verbo==='alta';
+  if(tipo==='maquina'){const m=maq(id);if(!activo){const ab=abiertasDe([id]);if(!confirm(`¿Dar de baja «${m.nombre} · ${m.lineaNom}»?${ab?`\n\nTiene ${ab} falla(s) abierta(s).`:''}\n\nSu historial se conserva.`))return}
+    await db.collection('maquinas').doc(id).set({nombre:m.nombre,linea:m.linea,activo},{merge:true})}
+  else if(tipo==='linea'){const l=LINEAS_TODAS.find(x=>x.id===id);if(!activo&&!confirm(`¿Dar de baja la línea «${l.nombre}» de ${l.planta} y sus máquinas?\n\nEl historial se conserva.`))return;
+    await db.collection('lineas').doc(id).set({nombre:l.nombre,planta:l.planta,area:l.area===l.planta?'':(l.area||''),activo},{merge:true})}
+  else{const p=PLANTAS_TODAS.find(x=>x.id===id);if(!activo&&!confirm(`¿Dar de baja la planta «${p.nombre}» con todas sus líneas?\n\nEl historial se conserva.`))return;
+    await db.collection('plantas').doc(id).set({nombre:p.nombre,activo,orden:p.orden??0},{merge:true})}
+  toast(activo?'Reactivado.':'Dado de baja. El historial se conserva.')}
+function enlazarCatalogo(){const f=$('fCat');if(f)f.onsubmit=guardarCat;const c=$('cancelCat');if(c)c.onclick=()=>{catEdit=null;render(true)};
+  const ap=$('catAddP');if(ap)ap.onclick=()=>{catEdit={tipo:'planta'};render(true)};const vb=$('catBajas');if(vb)vb.onclick=()=>{verBajas=!verBajas;render(true)};
+  document.querySelectorAll('[data-cat]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await accionCat(b.dataset.cat,b.dataset.id)}catch(er){toast(errTxt(er))}b.disabled=false})}
+
+// ===== Configuración de red (candado por IP) =====
+let RED={ok:true,ip:'',requerida:false},REDCFG=null,redRevision=0;
+function exentoRed(){return activoP()&&[PRINCIPAL,'Dirección'].includes(perfil.rol)}
+async function chequearRed(){
+  try{const s=await db.collection('config').doc('red').get();REDCFG=s.exists?s.data():{}}catch(e){REDCFG={}}
+  const ips=(REDCFG&&REDCFG.ips)||[];
+  if(!ips.length){RED={ok:true,ip:RED.ip,requerida:false};return true}
+  if(exentoRed()){RED={ok:true,ip:RED.ip,requerida:true,exento:true};return true}
+  try{RED=await llamar('verificarRed',{})}catch(e){console.warn(e);RED={ok:true,ip:'',requerida:true,error:true}}
+  return RED.ok!==false}
+function pantallaRed(){$('app').innerHTML=`<div class="card" style="text-align:center;border-top:6px solid var(--rojo)"><h2>🔒 Solo en la red de la empresa</h2><p>Para usar la plataforma conéctate al <b>wifi de La Josefina</b>.</p>${RED.ip?`<p class="muted">Tu red actual: ${esc(RED.ip)}</p>`:''}<div class="acciones" style="justify-content:center"><button id="reintentarRed">Ya me conecté · Reintentar</button></div></div>`;
+  const b=$('reintentarRed');if(b)b.onclick=()=>location.reload()}
+setInterval(async()=>{if(!usuario||!perfil||!activoP()||!REDCFG||!(REDCFG.ips||[]).length||exentoRed())return;const ok=await chequearRed();if(!ok){cerrarSubs(true);pantallaRed()}},8*60000);
+V.red=()=>{const ips=((REDCFG&&REDCFG.ips)||[]).join('\n');return `<div class="card"><h2>🌐 Configuración de red</h2>
+  <p>Si escribes la IP de la empresa, la plataforma <b>solo abre conectado a esa red</b> (wifi de la empresa). <b>Dirección y tú</b> entran desde cualquier red.</p>
+  <p>Si dejas el campo vacío, abre desde <b>cualquier red</b>.</p>
+  <div class="aviso"><b>Estado actual:</b> ${ips?'🔒 Restringido a la red de la empresa':'🔓 Abierto desde cualquier red'}<br><b>Tu IP en este momento:</b> <span id="miIp">${RED.ip?esc(RED.ip):'consultando…'}</span></div>
+  <form id="fRed"><label for="r_ips">IP pública de la empresa <small class="muted">(una por renglón; puedes terminar con * para un rango, ej. 2806:2f0:9a1:*)</small></label><textarea id="r_ips" rows="3" placeholder="Ej. 187.190.45.12">${esc(ips)}</textarea>
+  <div class="acciones"><button type="button" class="sec" id="usarMiIp">Usar mi IP actual</button><button type="submit">Guardar</button><button type="button" class="sec peligro" id="abrirRed">Quitar candado (abrir a cualquier red)</button></div><div id="redErr"></div></form>
+  <p class="muted"><b>Cómo obtener la IP:</b> conéctate al wifi de la empresa, abre esta pantalla y toca «Usar mi IP actual». Si sistemas te da la IP fija, también puedes escribirla.</p>
+  <p class="muted">Mecánicos, supervisores y operadoras con datos móviles no podrán entrar mientras haya candado. Las notificaciones de fallas sí les llegan al teléfono.</p></div>`};
+async function consultarMiIp(){try{const r=await llamar('verificarRed',{});RED=Object.assign({},RED,{ip:r.ip||''});const e=$('miIp');if(e)e.textContent=r.ip||'No disponible'}catch(e){const x=$('miIp');if(x)x.textContent='No disponible ('+errTxt(e)+')'}}
+function enlazarRed(){if(vista!=='red')return;if(!RED.ip)consultarMiIp();
+  const u=$('usarMiIp');if(u)u.onclick=()=>{if(!RED.ip){toast('Todavía no tengo tu IP. Espera unos segundos.');return}const t=$('r_ips');const l=t.value.split(/\n+/).map(x=>x.trim()).filter(Boolean);if(!l.includes(RED.ip))l.push(RED.ip);t.value=l.join('\n');$('app').dataset.sucio='1'};
+  const guardar=async ips=>{try{await db.collection('config').doc('red').set({ips,actualizado:TS(),por:perfil.nombre});REDCFG={ips};$('app').dataset.sucio='';toast(ips.length?'🔒 Candado activado.':'🔓 Abierto a cualquier red.');render(true)}catch(e){$('redErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
+  const f=$('fRed');if(f)f.onsubmit=ev=>{ev.preventDefault();const ips=$('r_ips').value.split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);if(ips.some(x=>!/^[0-9a-fA-F:.*]+$/.test(x))){$('redErr').innerHTML='<p class="error">Revisa las IP: solo números, puntos, dos puntos y *.</p>';return}guardar(ips)};
+  const a=$('abrirRed');if(a)a.onclick=()=>{if(confirm('¿Abrir la plataforma a cualquier red?'))guardar([])}}
+
+// ===== Reportes (Administrador principal) =====
+V.reportes=()=>`<div class="card"><h2>📥 Reportes en Excel</h2><p class="muted">Incluyen resumen ejecutivo, semáforo, desglose por máquina, mecánicos, fallas repetitivas, refacciones y comparación semanal. Descargar no modifica el historial.</p>
+  <div class="acciones"><button data-xlsr="semana">Esta semana</button><button class="sec" data-xlsr="anterior">Semana anterior</button><button class="sec" data-xlsr="7d">Últimos 7 días</button><button class="sec" data-xlsr="todo">Historial completo</button></div>
+  <p class="muted">Para otra semana, un rango de fechas o filtrar por área, línea o máquina, usa el <button class="mini sec" data-v2="ejecutivo">Tablero ejecutivo</button>.</p><div id="xlsMsg"></div></div>
+  <div class="card"><h2>🗄️ Respaldo</h2><p>Firebase guarda una <b>copia completa de la base de datos cada domingo</b> y conserva las últimas 8 semanas.</p><div class="acciones"><button class="sec" id="descargarRespaldo">Descargar respaldo ahora</button></div><p class="muted">Incluye trabajos, fallas, calendario, máquinas, inventario y usuarios (sin contraseñas ni fotos).</p></div>`;
+function enlazarReportes(){document.querySelectorAll('[data-xlsr]').forEach(b=>b.onclick=async()=>{const bs=document.querySelectorAll('[data-xlsr]');bs.forEach(x=>x.disabled=true);$('xlsMsg').innerHTML='<p class="muted">Preparando el Excel…</p>';
+  try{const n=await descargarExcel(periodo({per:b.dataset.xlsr}),{});$('xlsMsg').innerHTML=`<p class="muted">✅ Se descargó «${esc(n)}».</p>`}catch(e){$('xlsMsg').innerHTML=`<p class="error">${esc(e.message||String(e))}</p>`}bs.forEach(x=>x.disabled=false)})}
+
+// ===== Menú del Administrador principal (secciones desplegables) =====
+const MENU_PRINCIPAL=[
+  ['🚨 Operación',[['panel','Panel principal'],['alertas','Fallas en vivo'],['falla','Reportar falla'],['tablero','Tablero de producción'],['pantalla','Pantalla de mantenimiento']]],
+  ['📊 Indicadores',[['ejecutivo','Tablero ejecutivo'],['indicadores','Indicadores']]],
+  ['🔧 Mantenimiento',[['registrar','Registrar trabajo'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario']]],
+  ['🏭 Plantas y máquinas',[['catalogo','Plantas, líneas y máquinas'],['maquinas','Estado de máquinas, QR y horarios']]],
+  ['👥 Usuarios',[['usuarios','Administración de usuarios']]],
+  ['📦 Inventario',[['inventario','Refacciones']]],
+  ['📥 Reportes',[['reportes','Excel y respaldo']]],
+  ['🌐 Configuración de red',[['red','IP de la empresa']]]];
+let menuAbierto=null;
+function grupoDeVista(v){const i=MENU_PRINCIPAL.findIndex(g=>g[1].some(x=>x[0]===v||(v==='ficha'&&x[0]==='maquinas')));return i<0?null:i}
+function pintarMenuPrincipal(){const n=$('nav');if(!n)return;n.className='menu-p';const abierto=menuAbierto;
+  n.innerHTML=`<div class="mp-grupos">${MENU_PRINCIPAL.map((g,i)=>`<button class="mp-g${grupoDeVista(vista)===i?' actual':''}" data-g="${i}" aria-expanded="${abierto===i}">${g[0]} <span aria-hidden="true">${abierto===i?'▴':'▾'}</span></button>`).join('')}</div>
+  ${abierto!=null?`<div class="mp-sub">${MENU_PRINCIPAL[abierto][1].map(([v,t])=>`<button data-v="${v}" ${v===vista||(vista==='ficha'&&v==='maquinas')?'aria-current="page"':''}>${t}</button>`).join('')}</div>`:''}`;
+  n.querySelectorAll('[data-g]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const i=Number(b.dataset.g);menuAbierto=menuAbierto===i?null:i;pintarMenuPrincipal()})}
+
+function pintarPlantasHeader(){const e=$('plantasHeader');if(e)e.textContent='Plantas '+PLANTAS.join(' · ')}
 function enlazar(){
-  enlazarEjecutivo();enlazarTurnos();
+  enlazarEjecutivo();enlazarTurnos();enlazarCatalogo();enlazarRed();enlazarReportes();
   const f=$('form');
   if(f)f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]');b.disabled=true;$('fErr').innerHTML='';
     const adm=esAdmin(),est=$('m_est').value;
@@ -1352,7 +1509,7 @@ function enlazar(){
     }catch(e){$('fErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false}};
   const ff=$('formFalla');
   if(ff)ff.onsubmit=async ev=>{ev.preventDefault();const b=ff.querySelector('button[type=submit]');b.disabled=true;b.textContent='Enviando…';$('fErr').innerHTML='';
-    const eq=(ff.querySelector('input[name=f_maq]:checked')||{}).value,paro=(ff.querySelector('input[name=f_paro]:checked')||{}).value==='si';
+    const eq=(ff.querySelector('input[name=f_maq]:checked')||{}).value||($('f_maqsel')||{}).value,paro=(ff.querySelector('input[name=f_paro]:checked')||{}).value==='si';
     try{const ref=db.collection('registros').doc();const fotos=await subirFotos($('f_fotos'),ref.id);
       await ref.set({equipo:eq,tipo:'Reporte de falla',tipoFalla:$('f_tipo').value,fecha:hoy(),hora:horaAhora(),actividad:$('f_desc').value.trim(),severidad:paro?'Paro de línea':'Sin paro',paro:'',observaciones:'',estado:'Pendiente',tecnico:perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,refacciones:'',minutos:'',fotos,creadoEn:TS()});
       maqForm=null;toast('✅ Falla enviada. Los mecánicos ya fueron avisados.');render(true)}
@@ -1371,7 +1528,7 @@ function enlazar(){
     try{const batch=db.batch();for(let i=0;i<veces;i++)batch.set(db.collection('programa').doc(),{equipo:$('p_maq').value,fecha:sumarDias(fe,rep*i),actividad:$('p_act').value.trim(),responsable:$('p_resp').value.trim(),estado:'Programado',creadoEn:TS()});await batch.commit();
       diaSel=fe;calMes=new Date(aFecha(fe).getFullYear(),aFecha(fe).getMonth(),1);toast(veces>1?veces+' mantenimientos programados.':'Mantenimiento programado.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}};
   const fc=$('fCfg');if(fc)fc.onsubmit=async ev=>{ev.preventDefault();try{await db.collection('maquinas').doc(maqSel).set({frecuenciaDias:$('frec').value},{merge:true});toast('Frecuencia guardada.');render(true)}catch(e){toast(errTxt(e))}};
-  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML='<option value="todas">Todas las líneas de la planta</option>'+maquinasDe(pl.value).map(m=>`<option value="${m.id}">${esc(m.zona)}</option>`).join('')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
+  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML=opcionesLineaUsr(pl.value,'todas')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
   const fr=$('fReset');if(fr)fr.onsubmit=async ev=>{ev.preventDefault();const b=fr.querySelector('button');b.disabled=true;$('rErr').innerHTML='';try{await llamar('restablecerContrasena',{uid:fr.dataset.uid,contrasena:$('r_pass').value});toast('Contraseña restablecida.');$('r_pass').value=''}catch(e){$('rErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}b.disabled=false};
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
@@ -1440,7 +1597,7 @@ document.addEventListener('click',async e=>{
   if(b.id==='silenciar'){if(insiste())return;silencioHasta=Date.now()+5*60000;cerrarAlarma();toast('Sonido silenciado 5 minutos.');pintarBanner();return}
   if(b.id==='tableroCompleto'){tableroCompleto=!tableroCompleto;document.body.classList.toggle('modo-pantalla',tableroCompleto);render(true);return}
   if(b.id==='miCuenta'){ir('cuenta');return}
-  if(b.closest('#nav')&&b.dataset.v){ir(b.dataset.v);return}
+  if(b.closest('#nav')&&b.dataset.v){menuAbierto=null;ir(b.dataset.v);return}
   if(b.dataset.v2){ir(b.dataset.v2);return}
   if(b.dataset.fotos){verFotos(b.dataset.fotos.split(','));return}
   if(b.dataset.atender&&insiste()){abrirEscaner();return}
@@ -1479,8 +1636,8 @@ document.addEventListener('change',async e=>{const s=e.target.closest('select[da
 function migrables(){if(LS.get('dpc_migrado',false))return 0;return LS.get('dpc_registros',[]).length+LS.get('dpc_programa',[]).length}
 async function migrar(ev){const b=ev.target;b.disabled=true;
   try{const regs=LS.get('dpc_registros',[]),prog=LS.get('dpc_programa',[]),batch=db.batch();
-    regs.forEach(r=>{const d={equipo:MAQUINAS[0].id,fecha:r.fecha||hoy(),hora:r.hora||'',tipo:r.tipo||'Preventivo',actividad:r.actividad||'',tecnico:r.tecnico||'',refacciones:r.refacciones||'',minutos:r.minutos||'',estado:r.estado||'Completado',observaciones:r.observaciones||'',severidad:r.severidad||'',paro:r.paro||'',fechaCierre:r.fechaCierre||'',migrado:true,tecnicoUid:usuario.uid,rol:perfil.rol,creadoEn:TS()};batch.set(db.collection('registros').doc(),d)});
-    prog.forEach(p=>batch.set(db.collection('programa').doc(),{equipo:MAQUINAS[0].id,fecha:p.fecha,actividad:p.actividad||'',responsable:p.responsable||'',estado:p.estado||'Programado',creadoEn:TS()}));
+    regs.forEach(r=>{const d={equipo:'AMP-LA-001',fecha:r.fecha||hoy(),hora:r.hora||'',tipo:r.tipo||'Preventivo',actividad:r.actividad||'',tecnico:r.tecnico||'',refacciones:r.refacciones||'',minutos:r.minutos||'',estado:r.estado||'Completado',observaciones:r.observaciones||'',severidad:r.severidad||'',paro:r.paro||'',fechaCierre:r.fechaCierre||'',migrado:true,tecnicoUid:usuario.uid,rol:perfil.rol,creadoEn:TS()};batch.set(db.collection('registros').doc(),d)});
+    prog.forEach(p=>batch.set(db.collection('programa').doc(),{equipo:'AMP-LA-001',fecha:p.fecha,actividad:p.actividad||'',responsable:p.responsable||'',estado:p.estado||'Programado',creadoEn:TS()}));
     await batch.commit();LS.set('dpc_migrado',true);toast((regs.length+prog.length)+' registro(s) subidos a la Línea A.');render(true)
   }catch(e){toast(errTxt(e));b.disabled=false}}
 
@@ -1496,19 +1653,32 @@ function exportar(){const keys=['fecha','hora','equipo','linea','tipo','tipoFall
 async function copiar(t){try{await navigator.clipboard.writeText(t);toast('Enlace copiado.')}catch(e){const u=$('qrurl');if(u){const r=document.createRange();r.selectNodeContents(u);const s=getSelection();s.removeAllRanges();s.addRange(r)}toast('Selecciona y copia el enlace.')}}
 
 // ===== QR =====
-function urlQR(id){return URL_BASE+'?m='+maq(id).clave}
+function urlQR(id){const m=maq(id);return URL_BASE+(m&&m.clave?'?m='+m.clave:'?equipo='+encodeURIComponent(id))}
+// QR con el logo de La Josefina al centro (corrección de errores alta: se sigue leyendo aunque el logo tape una parte)
+const LOGO_QR=new Image();LOGO_QR.src='logo.png';
+function qrCanvas(id,size){size=size||512;const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px;top:0';document.body.appendChild(tmp);
+  try{new QRCode(tmp,{text:urlQR(id),width:size,height:size,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H})}catch(e){tmp.remove();return null}
+  const src=tmp.querySelector('canvas');const c=document.createElement('canvas');c.width=size;c.height=size;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,size,size);g.imageSmoothingEnabled=false;if(src)g.drawImage(src,0,0,size,size);tmp.remove();
+  const bw=Math.round(size*0.36),bh=Math.round(size*0.15),bx=Math.round((size-bw)/2),by=Math.round((size-bh)/2),r=Math.round(size*0.03);
+  g.fillStyle='#ffffff';g.beginPath();g.moveTo(bx+r,by);g.arcTo(bx+bw,by,bx+bw,by+bh,r);g.arcTo(bx+bw,by+bh,bx,by+bh,r);g.arcTo(bx,by+bh,bx,by,r);g.arcTo(bx,by,bx+bw,by,r);g.closePath();g.fill();
+  g.imageSmoothingEnabled=true;
+  if(LOGO_QR.complete&&LOGO_QR.naturalWidth){const pad=size*0.018,mw=bw-2*pad,mh=bh-2*pad,k=Math.min(mw/LOGO_QR.naturalWidth,mh/LOGO_QR.naturalHeight),w=LOGO_QR.naturalWidth*k,h=LOGO_QR.naturalHeight*k;g.drawImage(LOGO_QR,(size-w)/2,(size-h)/2,w,h)}
+  else{g.fillStyle='#d7262e';g.font=`italic bold ${Math.round(bh*0.42)}px Georgia,serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('La Josefina',size/2,size/2)}
+  return c}
 function pintarQR(id,boxId,size){const box=$(boxId);if(!box)return;box.innerHTML='';
   if(typeof QRCode==='undefined'){box.innerHTML='<small class="muted">No se pudo cargar el generador de QR.</small>';return}
-  new QRCode(box,{text:urlQR(id),width:size||180,height:size||180,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}
-function qrDataURL(id){const tmp=document.createElement('div');tmp.id='qrtmp';tmp.style.position='absolute';tmp.style.left='-9999px';document.body.appendChild(tmp);pintarQR(id,'qrtmp',512);
-  const c=tmp.querySelector('canvas');const m=maq(id);const out=document.createElement('canvas');out.width=640;out.height=760;const g=out.getContext('2d');
-  g.fillStyle='#fff';g.fillRect(0,0,640,760);g.imageSmoothingEnabled=false;if(c)g.drawImage(c,64,64,512,512);
-  g.fillStyle='#173f80';g.font='bold 34px -apple-system,Arial';g.textAlign='center';g.fillText(m.nombre+' · '+m.zona,320,630);
-  g.fillStyle='#1c2833';g.font='26px -apple-system,Arial';g.fillText('La Josefina DPC · Planta '+m.planta+' · '+m.id,320,675);g.font='22px -apple-system,Arial';g.fillText('Escanea para reportar una falla en esta máquina',320,715);
-  tmp.remove();return out.toDataURL('image/png')}
-function bajarQR(id){const a=document.createElement('a');a.href=qrDataURL(id);a.download='QR_La_Josefina_'+maq(id).zona.replace(' ','_')+'.png';document.body.appendChild(a);a.click();a.remove()}
-function imprimirQR(){const w=window.open('','_blank');if(!w){toast('Permite ventanas emergentes para imprimir.');return}
-  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Códigos QR · La Josefina DPC</title><style>body{font-family:-apple-system,Arial;margin:0;padding:20px;text-align:center}img{width:300px;max-width:90%;margin:10px;border:1px dashed #999}@media print{img{page-break-inside:avoid}}</style></head><body>'+MAQUINAS.map(m=>'<img src="'+qrDataURL(m.id)+'" alt="QR '+m.zona+'">').join('')+'<script>setTimeout(function(){window.print()},400)<\/script></body></html>');w.document.close()}
+  const dib=()=>{const c=qrCanvas(id,512);if(!c)return;const img=new Image();img.src=c.toDataURL('image/png');img.alt='QR '+((maq(id)||{}).zona||id);img.style.width=(size||180)+'px';img.style.height=(size||180)+'px';box.innerHTML='';box.appendChild(img)};
+  if(LOGO_QR.complete)dib();else{LOGO_QR.onload=dib;LOGO_QR.onerror=dib}}
+function qrDataURL(id){const m=maq(id);const q=qrCanvas(id,512);const out=document.createElement('canvas');out.width=640;out.height=790;const g=out.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,640,790);g.fillStyle='#173f80';g.fillRect(0,0,640,10);if(q)g.drawImage(q,64,58,512,512);
+  g.textAlign='center';g.fillStyle='#173f80';g.font='bold 34px -apple-system,Arial';g.fillText(m.nombre,320,622);
+  g.fillStyle='#1c2833';g.font='bold 28px -apple-system,Arial';g.fillText((m.planta?m.planta+' · ':'')+m.lineaNom,320,664);
+  g.fillStyle='#55606b';g.font='22px -apple-system,Arial';g.fillText((m.codigo?m.codigo+' · ':'')+'Escanea para reportar una falla',320,704);
+  g.fillStyle='#d7262e';g.font='italic bold 22px Georgia,serif';g.fillText('La Josefina · Mantenimiento',320,752);
+  return out.toDataURL('image/png')}
+function bajarQR(id){const m=maq(id);const a=document.createElement('a');a.href=qrDataURL(id);a.download='QR '+[m.planta,m.lineaNom,m.nombre].filter(Boolean).join(' ')+'.png';document.body.appendChild(a);a.click();a.remove()}
+function imprimirQR(ids){ids=Array.isArray(ids)&&ids.length?ids:MAQUINAS.map(m=>m.id);const w=window.open('','_blank');if(!w){toast('Permite ventanas emergentes para imprimir.');return}
+  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Códigos QR · La Josefina</title><style>body{font-family:-apple-system,Arial;margin:0;padding:16px;text-align:center}img{width:240px;max-width:44%;margin:8px;border:1px dashed #999}@media print{img{page-break-inside:avoid}}</style></head><body>'+ids.map(id=>'<img src="'+qrDataURL(id)+'" alt="QR">').join('')+'<script>setTimeout(function(){window.print()},500)<\/script></body></html>');w.document.close()}
 
 iniciar();
 </script>

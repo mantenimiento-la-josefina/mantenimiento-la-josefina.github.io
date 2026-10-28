@@ -3,14 +3,20 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function sesion() { return request.auth != null; }
     function miPerfil() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
-    function activo() { return sesion() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && miPerfil().data.activo == true; }
+    function perfilActivo() { return sesion() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && miPerfil().data.activo == true; }
+    // Candado de red: si hay IP configurada, solo se entra desde la red de la empresa (Dirección y Administrador principal, siempre)
+    function redLibre() { return !exists(/databases/$(database)/documents/config/red) || get(/databases/$(database)/documents/config/red).data.get('ips', []).size() == 0; }
+    function enRed() { return exists(/databases/$(database)/documents/accesoRed/$(request.auth.uid)) && get(/databases/$(database)/documents/accesoRed/$(request.auth.uid)).data.hasta > request.time; }
+    function redOk() { return miPerfil().data.rol in ['Administrador principal', 'Dirección'] || redLibre() || enRed(); }
+    function activo() { return perfilActivo() && redOk(); }
     function rol() { return miPerfil().data.rol; }
     function principal() { return activo() && rol() == 'Administrador principal'; }
     // Corrigen y cierran registros, calendario y configuración de máquinas
     function gestor() { return activo() && rol() in ['Administrador principal', 'Supervisor de mantenimiento']; }
     function altas() { return activo() && rol() in ['Administrador principal', 'Administrador', 'Dirección', 'Gerencia']; }
     function mecanico() { return activo() && rol() == 'Mecánico'; }
-    function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']; }
+    function maquinaValida(m) { return m in ['AMP-LA-001', 'AMP-LB-001']
+      || (exists(/databases/$(database)/documents/maquinas/$(m)) && get(/databases/$(database)/documents/maquinas/$(m)).data.get('activo', true) == true); }
     function rolAsignable(r) { return r in ['Administrador', 'Dirección', 'Gerencia', 'Coordinación', 'Supervisor de mantenimiento', 'Mecánico', 'Ingeniero de procesos', 'Operador']; }
     function cambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
     function esCuentaInicial() { return request.auth.token.email == '1000@lajosefina-dpc.app'; }
@@ -112,8 +118,8 @@ service cloud.firestore {
 
     // Ajustes de indicadores (semáforo): todos los leen, el administrador los cambia
     match /config/{id} {
-      allow read: if activo();
-      allow write: if gestor();
+      allow read: if activo() || (sesion() && id == 'red');
+      allow write: if (gestor() && id != 'red') || principal();
     }
 
     // Turnos con QR: la operadora inicia y finaliza el suyo; las correcciones dejan historial
@@ -146,9 +152,25 @@ service cloud.firestore {
       allow write: if gestor();
     }
 
+    // Máquinas: el Administrador principal las da de alta, edita y da de baja; el supervisor solo ajusta horario y frecuencia
     match /maquinas/{id} {
       allow read: if activo();
-      allow write: if gestor() && maquinaValida(id);
+      allow write: if principal();
+      allow create: if gestor() && id in ['AMP-LA-001', 'AMP-LB-001'];
+      allow update: if gestor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['horarios', 'horario', 'frecuenciaDias']);
+    }
+    match /plantas/{id} {
+      allow read: if activo();
+      allow write: if principal();
+    }
+    match /lineas/{id} {
+      allow read: if activo();
+      allow write: if principal();
+    }
+    // Acceso por red: solo lo escribe el servidor
+    match /accesoRed/{uid} {
+      allow read: if sesion() && request.auth.uid == uid;
+      allow write: if false;
     }
   }
 }

@@ -7,7 +7,7 @@ service cloud.firestore {
     // Candado de red: si hay IP configurada, solo se entra desde la red de la empresa (Dirección y Administrador principal, siempre)
     function redLibre() { return !exists(/databases/$(database)/documents/config/red) || get(/databases/$(database)/documents/config/red).data.get('ips', []).size() == 0; }
     function enRed() { return exists(/databases/$(database)/documents/accesoRed/$(request.auth.uid)) && get(/databases/$(database)/documents/accesoRed/$(request.auth.uid)).data.hasta > request.time; }
-    function redOk() { return miPerfil().data.rol in ['Administrador principal', 'Dirección'] || redLibre() || enRed(); }
+    function redOk() { return miPerfil().data.rol in ['Administrador principal', 'Dirección'] || miPerfil().data.get('accesoLibre', false) == true || redLibre() || enRed(); }
     function activo() { return perfilActivo() && redOk(); }
     function rol() { return miPerfil().data.rol; }
     function principal() { return activo() && rol() == 'Administrador principal'; }

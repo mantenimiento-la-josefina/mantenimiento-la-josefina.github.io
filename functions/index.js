@@ -238,6 +238,7 @@ exports.crearUsuario = onCall(async (req) => {
   await db.doc('usuarios/' + nuevo.uid).set({
     nombre: String(d.nombre || '').trim().slice(0, 80), usuario, numEmpleado: String(d.numEmpleado || ''), rol,
     planta: String(d.planta || ''), linea: String(d.linea || 'todas'), activo: d.activo !== false,
+    accesoLibre: yo.rol === PRINCIPAL && d.accesoLibre === true,
     creadoPor: req.auth.uid, creadoEn: FieldValue.serverTimestamp(),
   });
   return { uid: nuevo.uid };
@@ -293,7 +294,7 @@ exports.verificarRed = onCall(async (req) => {
   const ips = (cfg.ips || []).map(x => String(x).trim()).filter(Boolean);
   const p = await perfilDe(req.auth.uid);
   if (!p || p.activo !== true) throw new HttpsError('permission-denied', 'Cuenta inactiva.');
-  const exento = [PRINCIPAL, 'Dirección'].includes(p.rol);
+  const exento = [PRINCIPAL, 'Dirección'].includes(p.rol) || p.accesoLibre === true;
   const ok = !ips.length || exento || ipCoincide(ip, ips);
   if (ips.length && ok) await db.doc('accesoRed/' + req.auth.uid).set({ ip, hasta: Timestamp.fromMillis(Date.now() + 20 * 60000), en: FieldValue.serverTimestamp() });
   return { ok, ip, requerida: ips.length > 0, exento };

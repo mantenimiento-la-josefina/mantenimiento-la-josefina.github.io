@@ -958,6 +958,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option value="${r}" ${r===u.rol?'selected':''}>${rolTxt(r)}</option>`).join('')}</select></div>
   <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta">${PLANTAS.concat(u.planta&&!PLANTAS.includes(u.planta)?[u.planta]:[]).map(p=>`<option ${p===u.planta?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea">${opcionesLineaUsr(u.planta||PLANTAS[0],u.linea)}</select></div>
+  ${esPrincipal()?`<label class="chk" style="grid-column:1/-1;margin-top:6px"><input type="checkbox" id="u_libre" ${u.accesoLibre?'checked':''}> 🌐 Puede entrar desde cualquier red <small class="muted">(aunque no esté en el wifi de la empresa)</small></label>`:''}
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
   ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>
   <div><label for="u_pass">Contraseña inicial (mín. 6)</label><input id="u_pass" required minlength="6" autocomplete="new-password"></div></div>
@@ -978,7 +979,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="card"><h2>Usuarios registrados (${USUARIOS.length})</h2><label for="u_buscar">Buscar</label><input id="u_buscar" value="${esc(usrFiltro)}" placeholder="Nombre, usuario, número o puesto">
   <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>No. empl.</th><th>Puesto</th><th>Planta / línea</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(u=>{const yo=u.uid===usuario.uid,prot=u.rol===PRINCIPAL;return `<tr>
   <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
-  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span></td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
+  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span>${u.accesoLibre?' <span class="tag plan" title="Puede entrar desde cualquier red">🌐 Fuera de red</span>':''}</td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
   <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
   <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button>${u.activo?'':`<button class="mini peligro" data-eliminarusr="${esc(u.uid)}">Eliminar</button>`}</div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
@@ -1436,7 +1437,8 @@ function enlazarCatalogo(){const f=$('fCat');if(f)f.onsubmit=guardarCat;const c=
 
 // ===== Configuración de red (candado por IP) =====
 let RED={ok:true,ip:'',requerida:false},REDCFG=null,redRevision=0;
-function exentoRed(){return activoP()&&[PRINCIPAL,'Dirección'].includes(perfil.rol)}
+function exentoRed(){return activoP()&&([PRINCIPAL,'Dirección'].includes(perfil.rol)||perfil.accesoLibre===true)}
+const ROLES_SIEMPRE_RED=[PRINCIPAL,'Dirección'];
 async function chequearRed(){
   try{const s=await db.collection('config').doc('red').get();REDCFG=s.exists?s.data():{}}catch(e){REDCFG={}}
   const ips=(REDCFG&&REDCFG.ips)||[];
@@ -1454,13 +1456,23 @@ V.red=()=>{const ips=((REDCFG&&REDCFG.ips)||[]).join('\n');return `<div class="c
   <form id="fRed"><label for="r_ips">IP pública de la empresa <small class="muted">(una por renglón; puedes terminar con * para un rango, ej. 2806:2f0:9a1:*)</small></label><textarea id="r_ips" rows="3" placeholder="Ej. 187.190.45.12">${esc(ips)}</textarea>
   <div class="acciones"><button type="button" class="sec" id="usarMiIp">Usar mi IP actual</button><button type="submit">Guardar</button><button type="button" class="sec peligro" id="abrirRed">Quitar candado (abrir a cualquier red)</button></div><div id="redErr"></div></form>
   <p class="muted"><b>Cómo obtener la IP:</b> conéctate al wifi de la empresa, abre esta pantalla y toca «Usar mi IP actual». Si sistemas te da la IP fija, también puedes escribirla.</p>
-  <p class="muted">Mecánicos, supervisores y operadoras con datos móviles no podrán entrar mientras haya candado. Las notificaciones de fallas sí les llegan al teléfono.</p></div>`};
+  <p class="muted">Mecánicos, supervisores y operadoras con datos móviles no podrán entrar mientras haya candado, salvo quienes tengan permiso. Las notificaciones de fallas sí les llegan al teléfono.</p></div>
+  ${(()=>{const otros=USUARIOS.filter(u=>u.activo&&!ROLES_SIEMPRE_RED.includes(u.rol)),con=otros.filter(u=>u.accesoLibre===true),q=redBusca.trim().toLowerCase(),sin=q?otros.filter(u=>u.accesoLibre!==true&&[u.nombre,u.usuario,u.numEmpleado,u.rol].join(' ').toLowerCase().includes(q)).slice(0,12):[];
+    const fila=(u,dar)=>`<div class="item"><div><b>${esc(u.nombre)}</b><br><small class="muted">${esc(rolTxt(u.rol))} · ${esc(u.usuario||'')}${u.planta?' · '+esc(u.planta):''}</small></div><button class="mini ${dar?'':'peligro'}" data-libre="${dar?'1':'0'}" data-uid="${esc(u.uid)}">${dar?'Dar permiso':'Quitar permiso'}</button></div>`;
+    return `<div class="card"><h2>👤 Personas con permiso fuera de la red</h2><p class="muted" style="margin-top:-4px">Estas personas entran desde cualquier red aunque el candado esté activo. Dirección y tú siempre entran.</p>
+    ${con.length?con.map(u=>fila(u,false)).join(''):'<p class="muted">Nadie tiene permiso especial todavía.</p>'}
+    <label for="redBusca">Dar permiso a otra persona</label><input id="redBusca" type="search" placeholder="Busca por nombre, usuario o número de empleado" value="${esc(redBusca)}" autocomplete="off">
+    <div id="redRes">${q?(sin.length?sin.map(u=>fila(u,true)).join(''):'<p class="muted">No encontré a nadie con ese nombre.</p>'):''}</div></div>`})()}`};
+let redBusca='';
 async function consultarMiIp(){try{const r=await llamar('verificarRed',{});RED=Object.assign({},RED,{ip:r.ip||''});const e=$('miIp');if(e)e.textContent=r.ip||'No disponible'}catch(e){const x=$('miIp');if(x)x.textContent='No disponible ('+errTxt(e)+')'}}
 function enlazarRed(){if(vista!=='red')return;if(!RED.ip)consultarMiIp();
   const u=$('usarMiIp');if(u)u.onclick=()=>{if(!RED.ip){toast('Todavía no tengo tu IP. Espera unos segundos.');return}const t=$('r_ips');const l=t.value.split(/\n+/).map(x=>x.trim()).filter(Boolean);if(!l.includes(RED.ip))l.push(RED.ip);t.value=l.join('\n');$('app').dataset.sucio='1'};
   const guardar=async ips=>{try{await db.collection('config').doc('red').set({ips,actualizado:TS(),por:perfil.nombre});REDCFG={ips};$('app').dataset.sucio='';toast(ips.length?'🔒 Candado activado.':'🔓 Abierto a cualquier red.');render(true)}catch(e){$('redErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}};
   const f=$('fRed');if(f)f.onsubmit=ev=>{ev.preventDefault();const ips=$('r_ips').value.split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);if(ips.some(x=>!/^[0-9a-fA-F:.*]+$/.test(x))){$('redErr').innerHTML='<p class="error">Revisa las IP: solo números, puntos, dos puntos y *.</p>';return}guardar(ips)};
-  const a=$('abrirRed');if(a)a.onclick=()=>{if(confirm('¿Abrir la plataforma a cualquier red?'))guardar([])}}
+  const a=$('abrirRed');if(a)a.onclick=()=>{if(confirm('¿Abrir la plataforma a cualquier red?'))guardar([])};
+  const rb=$('redBusca');if(rb)rb.oninput=()=>{redBusca=rb.value;const pos=rb.selectionStart;render(true);const n=$('redBusca');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}};
+  document.querySelectorAll('[data-libre]').forEach(b=>b.onclick=async()=>{const u=USUARIOS.find(x=>x.uid===b.dataset.uid),dar=b.dataset.libre==='1';if(!u)return;b.disabled=true;
+    try{await db.collection('usuarios').doc(u.uid).update({accesoLibre:dar,modificadoPor:usuario.uid,modificadoEn:TS()});if(dar)redBusca='';toast(dar?'🌐 '+u.nombre+' ya puede entrar desde cualquier red.':'Se quitó el permiso a '+u.nombre+'.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}})}
 
 // ===== Reportes (Administrador principal) =====
 V.reportes=()=>`<div class="card"><h2>📥 Reportes en Excel</h2><p class="muted">Incluyen resumen ejecutivo, semáforo, desglose por máquina, mecánicos, fallas repetitivas, refacciones y comparación semanal. Descargar no modifica el historial.</p>
@@ -1563,7 +1575,7 @@ function enlazar(){
 }
 async function guardarUsuario(ev){ev.preventDefault();const f=ev.target,b=f.querySelector('button[type=submit]');b.disabled=true;$('uErr').innerHTML='';
   const uid=f.dataset.uid,num=$('u_num').value.trim();
-  const datos={nombre:$('u_nom').value.trim(),numEmpleado:num,rol:$('u_rol').value,planta:$('u_planta').value,linea:$('u_linea').value,activo:$('u_act').value==='1'};
+  const datos={nombre:$('u_nom').value.trim(),numEmpleado:num,rol:$('u_rol').value,planta:$('u_planta').value,linea:$('u_linea').value,activo:$('u_act').value==='1'};if($('u_libre'))datos.accesoLibre=$('u_libre').checked;
   if(num&&!/^[0-9]{1,10}$/.test(num)){$('uErr').innerHTML='<p class="error">El número de empleado solo puede tener dígitos.</p>';b.disabled=false;return}
   try{
     if(uid){await db.collection('usuarios').doc(uid).update(Object.assign(datos,{modificadoPor:usuario.uid,modificadoEn:TS()}));usrEdit=null;toast('Datos de '+datos.nombre+' actualizados.');render(true);return}

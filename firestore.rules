@@ -71,6 +71,14 @@ service cloud.firestore {
             && request.resource.data.estado in ['Por confirmar', 'Cerrada']
             && request.resource.data.finAtencion == request.time
             && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos', 'causa']))
+        // Revisión a los 15 minutos: la operadora confirma que la máquina sigue bien o marca reincidencia
+        || (activo() && rol() in ['Operador', 'Ingeniero de procesos'] && resource.data.tipo == 'Reporte de falla'
+            && resource.data.estado == 'Cerrada'
+            && !('segundaConf' in resource.data)
+            && request.resource.data.segundaConf in ['ok', 'no']
+            && request.resource.data.segundaConfEn == request.time
+            && request.resource.data.segundaConfPor == miPerfil().data.nombre
+            && cambia(['segundaConf', 'segundaConfEn', 'segundaConfPor', 'reincidenciaId']))
         // La operadora (o ingeniero de procesos) confirma: ✅ quedó bien / ❌ sigue fallando
         || (activo() && rol() in ['Operador', 'Ingeniero de procesos'] && resource.data.tipo == 'Reporte de falla'
             && resource.data.estado == 'Por confirmar'
@@ -125,7 +133,9 @@ service cloud.firestore {
     // Turnos con QR: la operadora inicia y finaliza el suyo; las correcciones dejan historial
     match /turnos/{id} {
       allow read: if activo() && (resource.data.operadorUid == request.auth.uid
-        || rol() in ['Administrador principal', 'Supervisor de mantenimiento', 'Dirección', 'Gerencia', 'Coordinación']);
+        || rol() in ['Administrador principal', 'Supervisor de mantenimiento', 'Dirección', 'Gerencia', 'Coordinación']
+        || 'ejecutivo' in miPerfil().data.get('vistas', [])
+        || 'reportes' in miPerfil().data.get('vistas', []));
       allow create: if activo() && rol() in ['Operador', 'Administrador principal']
         && maquinaValida(request.resource.data.equipo)
         && request.resource.data.operadorUid == request.auth.uid

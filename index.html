@@ -217,6 +217,8 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .mp-g.actual{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}.mp-g[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink)}
 .mp-sub{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding:10px;background:var(--accent-soft);border-radius:12px}.mp-sub button{background:var(--card);color:var(--fg);border:1px solid var(--line)}.mp-sub button[aria-current]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .cathead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.cathead h2,.cathead h3{margin:0}.catlin{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0}.catmaq{gap:10px}.catform{background:var(--accent-soft);margin:10px 0}.selmaqsel{max-width:420px}
+.permisos{border:1px solid var(--accent-line);border-radius:12px;padding:10px 14px;margin:12px 0;background:var(--accent-soft)}.permisos legend{font-weight:700;padding:0 6px}
+.permgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px}.permgrid .chk{margin:2px 0;font-weight:500;display:flex;align-items:center;gap:8px}.permgrid .chk input{width:auto;margin:0;flex:0 0 auto;min-height:0}
 </style>
 </head>
 <body>
@@ -378,8 +380,58 @@ function recibeEsc(){return activoP()&&['Supervisor de mantenimiento','Coordinac
 function conAlertas(){return atiende()||avisa()||recibeEsc()}
 function puedeRegistrar(){return esPrincipal()||esMecanico()}
 function insiste(){return esMecanico()}
-function vistasPermitidas(){return VISTAS[grupo()]||['cuenta']}
-function inicioRol(){return INICIO[grupo()]||'cuenta'}
+// ===== Permisos por persona: qué secciones ve cada quien (lo decide el Administrador principal) =====
+const SECCIONES=[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones'],['alertas','🚨 Fallas en vivo'],['pantalla','Pantalla de mantenimiento'],['tablero','🟢 Tablero de producción'],['ejecutivo','📊 Tablero ejecutivo'],['indicadores','Indicadores'],['reportes','📥 Reportes en Excel'],['panel','Panel principal'],['maquinas','Máquinas y fichas'],['registrar','Registrar trabajo'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['inventario','📦 Inventario']];
+const CLAVES_SEC=SECCIONES.map(s=>s[0]);
+function grupoDeRol(rol){return rol===PRINCIPAL?'principal':['Dirección','Gerencia'].includes(rol)?'direccion':rol==='Coordinación'?'coordinacion':rol}
+function vistasDefecto(rol){return VISTAS[grupoDeRol(rol)]||['cuenta']}
+function seccionesDefecto(rol){return vistasDefecto(rol).filter(k=>CLAVES_SEC.includes(k))}
+function personalizado(){return grupo()!=='principal'&&!!perfil&&Array.isArray(perfil.vistas)}
+function vistasPermitidas(){const base=VISTAS[grupo()]||['cuenta'];if(!personalizado())return base;
+  const v=perfil.vistas.filter(k=>CLAVES_SEC.includes(k)),out=new Set(v);out.add('cuenta');if(base.includes('usuarios'))out.add('usuarios');if(v.includes('maquinas')||base.includes('ficha'))out.add('ficha');return [...out]}
+function navItems(){const vp=vistasPermitidas(),nav=(NAV[grupo()]||[]).filter(x=>vp.includes(x[0]));if(!personalizado())return NAV[grupo()]||[];
+  return nav.concat(SECCIONES.filter(s=>vp.includes(s[0])&&!nav.some(x=>x[0]===s[0])))}
+function inicioRol(){const i=INICIO[grupo()]||'cuenta',vp=vistasPermitidas();if(vp.includes(i))return i;const n=navItems();return n.length?n[0][0]:'cuenta'}
+function permisosForm(u){if(!esPrincipal()||u.rol===PRINCIPAL)return '';const sel=Array.isArray(u.vistas)?u.vistas:seccionesDefecto(u.rol);
+  return `<fieldset class="permisos" id="u_perm" data-tocado="${Array.isArray(u.vistas)?'1':''}"><legend>¿Qué puede ver?</legend><p class="muted" style="margin:0 0 8px">Vienen marcadas según el puesto. Pon o quita palomitas y guarda.</p>
+  <div class="permgrid">${SECCIONES.map(([k,t])=>`<label class="chk"><input type="checkbox" name="u_v" value="${k}" ${sel.includes(k)?'checked':''}> ${t}</label>`).join('')}</div>
+  <div class="acciones" style="margin-top:8px"><button type="button" class="mini sec" id="u_permDef">Restablecer según el puesto</button></div>
+  <small class="muted">«Mi cuenta» siempre está disponible. «Configuración de red» y «Plantas y máquinas» son solo tuyas.${vistasDefecto(u.rol).includes('usuarios')?' Este puesto también da de alta usuarios.':''}</small></fieldset>`}
+function leerPermisos(rol){const f=$('u_perm');if(!f)return undefined;const v=[...f.querySelectorAll('[name=u_v]:checked')].map(x=>x.value),d=seccionesDefecto(rol);
+  return v.length===d.length&&v.every(k=>d.includes(k))?null:v}
+function enlazarPermisos(){const f=$('u_perm');if(!f)return;const marcar=rol=>{const d=seccionesDefecto(rol);f.querySelectorAll('[name=u_v]').forEach(x=>x.checked=d.includes(x.value))};
+  f.querySelectorAll('[name=u_v]').forEach(x=>x.addEventListener('change',()=>f.dataset.tocado='1'));
+  const r=$('u_rol');if(r)r.addEventListener('change',()=>{if(!f.dataset.tocado)marcar(r.value)});
+  const b=$('u_permDef');if(b)b.onclick=()=>{marcar($('u_rol').value);f.dataset.tocado=''}}
+
+// ===== Reincidencias: la misma máquina vuelve a fallar poco después de una reparación =====
+const REINC_MIN=30, SEGUNDA_MIN=15;
+let _rcKey='',_rc={};
+function mapaReinc(){const fallas=REG.filter(esFalla),key=fallas.length+'|'+fallas.reduce((t,r)=>t+(ms(r.finAtencion)||0)%9973+(r.reincidenciaDe?1:0),0);if(key===_rcKey)return _rc;
+  const out={},porEq={};fallas.forEach(r=>(porEq[r.equipo]=porEq[r.equipo]||[]).push(r));
+  Object.values(porEq).forEach(l=>l.forEach(f=>{let p=null;const c=msCreado(f);
+    if(f.reincidenciaDe)p=REG.find(x=>x.id===f.reincidenciaDe)||null;
+    else if(c)l.forEach(x=>{if(x===f)return;const fin=ms(x.finAtencion);if(fin&&fin<c&&c-fin<=REINC_MIN*60000&&(!p||fin>ms(p.finAtencion)))p=x});
+    if(p)out[f.id]={prev:p,min:Math.max(0,Math.round((c-(ms(p.finAtencion)||c))/60000)),via:f.reincidenciaDe?'Segunda confirmación (15 min)':'Nuevo reporte en menos de '+REINC_MIN+' min'}}));
+  _rcKey=key;_rc=out;return out}
+function tagReinc(r){const x=esFalla(r)&&mapaReinc()[r.id];return x?`<br><span class="tag bad" title="Volvió a fallar ${x.min} min después de la reparación de ${esc(x.prev.atendidoPor||'')}">🔁 Reincidencia</span>`:''}
+// Segunda confirmación: 15 min después de confirmar ✅, se pregunta otra vez si la máquina sigue bien
+function segundaPendiente(r){if(!esFalla(r)||r.estado!=='Cerrada'||r.segundaConf||r.reincidenciaId)return false;const c=ms(r.confirmadoEn);if(!c||!r.confirmadoUid)return false;const d=Date.now()-c;return d>=SEGUNDA_MIN*60000&&d<=4*3600000}
+function misSegundas(){return puedeConfirmar()&&perfil.rol!==PRINCIPAL&&perfil.rol!=='Supervisor de mantenimiento'?REG.filter(segundaPendiente).filter(deMiLinea).sort((a,b)=>ms(a.confirmadoEn)-ms(b.confirmadoEn)):[]}
+function tarjetaSegunda(r){const m=maq(r.equipo);return `<div class="fcard" style="border-left-color:var(--accent)"><h3>${esc(m?m.planta+' · '+m.zona:r.equipo)}</h3>
+  <p style="margin:0 0 4px"><b>${esc(r.tipoFalla||'Falla')}</b> · reparada${ms(r.finAtencion)?' a las '+hhmm(ms(r.finAtencion)):''}${r.atendidoPor?' por '+esc(r.atendidoPor):''}</p>
+  <p style="margin:10px 0 8px;font-size:18px;font-weight:700">¿La máquina sigue trabajando bien?</p>
+  <div class="confirmar2"><button class="si" data-conf2="si" data-id="${esc(r.id)}" aria-label="Sí, sigue bien">✅<span>Sí</span></button><button class="no" data-conf2="no" data-id="${esc(r.id)}" aria-label="No, volvió a fallar">❌<span>No</span></button></div></div>`}
+let segundasVistas=new Set();
+setInterval(()=>{if(!perfil||!usuario)return;const l=misSegundas();const nuevas=l.filter(r=>!segundasVistas.has(r.id));if(nuevas.length){nuevas.forEach(r=>segundasVistas.add(r.id));try{sirenaSuave(true)}catch(e){}toast('🔎 Revisa: ¿la máquina reparada sigue bien?');if(vista==='falla'&&!formOcupado())render()}},30000);
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-conf2]');if(!b)return;const r=REG.find(x=>x.id===b.dataset.id);if(!r||!segundaPendiente(r))return;
+  b.closest('.confirmar2').querySelectorAll('button').forEach(x=>x.disabled=true);
+  try{if(b.dataset.conf2==='si'){await db.collection('registros').doc(r.id).update({segundaConf:'ok',segundaConfEn:TS(),segundaConfPor:perfil.nombre});toast('✅ Gracias. La reparación quedó confirmada.')}
+    else{const ref=db.collection('registros').doc();
+      await ref.set({equipo:r.equipo,tipo:'Reporte de falla',tipoFalla:r.tipoFalla||'Otra',fecha:hoy(),hora:horaAhora(),actividad:'Reincidencia: volvió a fallar después de la reparación de las '+hhmm(ms(r.finAtencion))+'. '+String(r.actividad||'').slice(0,300),severidad:r.severidad||'Paro de línea',paro:'',observaciones:'',estado:'Pendiente',tecnico:perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,refacciones:'',minutos:'',fotos:[],creadoEn:TS(),reincidenciaDe:r.id});
+      await db.collection('registros').doc(r.id).update({segundaConf:'no',segundaConfEn:TS(),segundaConfPor:perfil.nombre,reincidenciaId:ref.id});
+      toast('🔁 Se avisó a los mecánicos: reincidencia en '+((maq(r.equipo)||{}).zona||'la máquina')+'.')}}
+  catch(er){toast(errTxt(er));b.closest('.confirmar2').querySelectorAll('button').forEach(x=>x.disabled=false)}});
 function correoDe(u){u=String(u||'').replace(/\s+/g,'').toLowerCase();return u+'@'+DOMINIO}
 function usuarioDe(correo){return String(correo||'').replace('@'+DOMINIO,'')}
 function ms(t){try{if(t&&t.toMillis)return t.toMillis()}catch(e){}return null}
@@ -499,7 +551,7 @@ function pintarSesion(){
   s.innerHTML=`<div><b>${esc(perfil.nombre)}</b>${esc(rolTxt(perfil.rol))} · ${esc(usuarioDe(usuario.email))}</div><button id="miCuenta">Mi cuenta</button><button id="salir">Cerrar sesión</button>`;
   const n=$('nav');n.hidden=false;n.className=perfil.rol==='Operador'?'grande':'';
   if(grupo()==='principal'){pintarMenuPrincipal();return}
-  n.innerHTML=(NAV[grupo()]||[]).map(([v,t])=>`<button data-v="${v}">${t}</button>`).join('');
+  n.innerHTML=navItems().map(([v,t])=>`<button data-v="${v}">${t}</button>`).join('');
   marcarNav();
 }
 function marcarNav(){if(grupo()==='principal'){pintarMenuPrincipal();return}document.querySelectorAll('#nav button').forEach(b=>{const act=b.dataset.v===vista||(vista==='ficha'&&b.dataset.v==='maquinas');if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
@@ -687,7 +739,7 @@ function filas(arr,opc={}){
   return `<div class="scroll"><table><thead><tr><th>Fecha</th>${opc.sinMaq?'':'<th>Máquina</th>'}<th>Tipo</th><th>Actividad / falla</th><th>Responsable</th><th>Duración</th><th>Estado</th>${acc?'<th></th>':''}</tr></thead><tbody>${arr.map(r=>{const fotos=[...(r.fotos||[]),...(r.fotosCierre||[])];return `<tr>
   <td class="num">${fmt(r.fecha)}${r.hora?`<br><small class="muted">${esc(r.hora)}</small>`:''}</td>
   ${opc.sinMaq?'':`<td>${tagMaq(r.equipo)}</td>`}
-  <td>${tagTipo(r.tipo)}${r.tipoFalla?`<br><small class="muted">${esc(r.tipoFalla)}</small>`:''}${r.severidad==='Paro de línea'?`<br><small class="muted">Paro de línea</small>`:''}</td>
+  <td>${tagTipo(r.tipo)}${r.tipoFalla?`<br><small class="muted">${esc(r.tipoFalla)}</small>`:''}${tagReinc(r)}${r.severidad==='Paro de línea'?`<br><small class="muted">Paro de línea</small>`:''}</td>
   <td>${esc(r.actividad)}${r.refacciones?`<br><small class="muted">Refacciones: ${esc(r.refacciones)}</small>`:''}${r.observaciones?`<br><small class="muted">Obs.: ${esc(r.observaciones)}</small>`:''}${r.paro?`<br><small class="muted">Paro de línea: ${esc(r.paro)} min</small>`:''}${detalleFalla(r)}${fotos.length?'<br>'+fotosBtn(fotos):''}</td>
   <td>${esc(r.tecnico)}${r.rol?`<br><small class="muted">${esc(r.rol)}</small>`:''}</td>
   <td class="num">${r.minutos?esc(r.minutos)+' min':'—'}</td>
@@ -819,7 +871,8 @@ function formMant(){
 }
 V.registrar=()=>!editId&&!puedeRegistrar()?'<div class="card"><h2>Registrar trabajo</h2><p>Los trabajos los registran los mecánicos. Desde «Trabajos registrados» puedes corregir o cerrar un registro con el botón Editar.</p></div>':formMant();
 V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(b)-msCreado(a));const porConf=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r)).sort((a,b)=>(ms(a.finAtencion)||0)-(ms(b.finAtencion)||0));
-  return `${tarjetaTurno()}${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
+  const seg=misSegundas();
+  return `${tarjetaTurno()}${seg.length?`<h2>🔎 Revisión a los ${SEGUNDA_MIN} minutos (${seg.length})</h2>${seg.map(tarjetaSegunda).join('')}`:''}${porConf.length&&puedeConfirmar()?`<h2>✅ Confirma las reparaciones (${porConf.length})</h2>${porConf.map(tarjetaConfirmar).join('')}`:''}<div class="card"><h2>🚨 Reportar falla</h2><form id="formFalla">
   ${(()=>{const fija=maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:null),mf=fija&&maq(fija);
     if(mf)return `<div class="aviso" style="margin:6px 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><small>Máquina</small><br><b style="font-size:18px">${esc(mf.nombre)} · ${esc(mf.planta)} · ${esc(mf.lineaNom)}</b></div><button type="button" class="mini sec" id="cambiarMaq">Cambiar</button></div><input type="radio" name="f_maq" value="${mf.id}" checked hidden>`;
     const lista=misLineas()&&misLineas().length?MAQUINAS.filter(m=>misLineas().includes(m.id)):MAQUINAS;
@@ -960,6 +1013,7 @@ function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],l
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea">${opcionesLineaUsr(u.planta||PLANTAS[0],u.linea)}</select></div>
   ${esPrincipal()?`<label class="chk" style="grid-column:1/-1;margin-top:6px"><input type="checkbox" id="u_libre" ${u.accesoLibre?'checked':''}> 🌐 Puede entrar desde cualquier red <small class="muted">(aunque no esté en el wifi de la empresa)</small></label>`:''}
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>
+  ${permisosForm(u)}
   ${nuevo?`<div class="dos"><div><label for="u_user">Nombre de usuario</label><input id="u_user" required maxlength="40" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej. juan.perez o 2005"></div>
   <div><label for="u_pass">Contraseña inicial (mín. 6)</label><input id="u_pass" required minlength="6" autocomplete="new-password"></div></div>
   <p class="muted" style="margin:8px 0 0">El usuario solo puede tener letras sin acento, números, punto, guion o guion bajo. No se puede cambiar después.</p>`
@@ -979,7 +1033,7 @@ V.usuarios=()=>{const q=usrFiltro.toLowerCase();const lista=USUARIOS.slice().fil
   <div class="card"><h2>Usuarios registrados (${USUARIOS.length})</h2><label for="u_buscar">Buscar</label><input id="u_buscar" value="${esc(usrFiltro)}" placeholder="Nombre, usuario, número o puesto">
   <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>No. empl.</th><th>Puesto</th><th>Planta / línea</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(u=>{const yo=u.uid===usuario.uid,prot=u.rol===PRINCIPAL;return `<tr>
   <td>${esc(u.nombre)}${yo?' <small class="muted">(tú)</small>':''}</td><td>${esc(u.usuario)}</td><td class="num">${esc(u.numEmpleado||'—')}</td>
-  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span>${u.accesoLibre?' <span class="tag plan" title="Puede entrar desde cualquier red">🌐 Fuera de red</span>':''}</td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
+  <td><span class="tag ${COLOR_ROL[u.rol]||'neu'}">${esc(rolTxt(u.rol))}</span>${u.accesoLibre?' <span class="tag plan" title="Puede entrar desde cualquier red">🌐 Fuera de red</span>':''}${Array.isArray(u.vistas)?' <span class="tag neu" title="Tiene secciones distintas a las de su puesto">✔️ Permisos a medida</span>':''}</td><td>${esc(u.planta||PLANTAS[0])}<br><small class="muted">${esc(nombreLinea(u.linea))}</small></td>
   <td>${u.activo?'<span class="tag">Activa</span>':'<span class="tag neu">Inactiva</span>'}</td>
   <td>${prot||yo||!prin?'':`<div class="acciones" style="margin:0"><button class="mini sec" data-editusr="${esc(u.uid)}">Modificar</button><button class="mini ${u.activo?'peligro':''}" data-activo="${esc(u.uid)}">${u.activo?'Desactivar':'Activar'}</button>${u.activo?'':`<button class="mini peligro" data-eliminarusr="${esc(u.uid)}">Eliminar</button>`}</div>`}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="card"><h2>Permisos por puesto</h2>
@@ -1063,16 +1117,21 @@ function calcMaq(m,a,b,now){const fin=Math.min(b,now);
   const u=unir(ints),paroTot=largo(u),v=ventanas(m.id,a,fin),prog=v?largo(v):null,paroProg=v?cruce(u,v):null;
   const perdido=v?paroProg:paroTot,perdPct=prog?paroProg/prog*100:null;
   const resp=fallas.map(r=>tiempos(r).resp).filter(x=>x!=null&&x>=0),rep=fallas.map(r=>tiempos(r).rep).filter(x=>x!=null&&x>=0);
-  return {m,regs,fallas,nf:fallas.length,paros:conParo.length,veces:u.length,paroTot,prog,paroProg,perdido,perdPct,disp:prog?Math.max(0,1-paroProg/prog):null,sem:semaforo(perdPct),resp,rep,
+  const RC=mapaReinc();
+  return {m,regs,fallas,reinc:fallas.filter(r=>RC[r.id]).length,reparadas:fallas.filter(r=>ms(r.finAtencion)).length,nf:fallas.length,paros:conParo.length,veces:u.length,paroTot,prog,paroProg,perdido,perdPct,disp:prog?Math.max(0,1-paroProg/prog):null,sem:semaforo(perdPct),resp,rep,
     resueltas:fallas.filter(r=>CERRADOS.includes(r.estado)).length,trabajos:regs.length-fallas.length,sinFin:conParo.filter(r=>!intParo(r,now)).length,turnoH:horasTurnoQR(m.id,a,fin,now),enCurso,sinHorario:!v}}
 function agregar(l){const sum=k=>l.reduce((t,x)=>t+(x[k]||0),0),cp=l.filter(x=>x.prog!=null),P=cp.reduce((t,x)=>t+x.prog,0),PP=cp.reduce((t,x)=>t+x.paroProg,0),perdPct=P?PP/P*100:null;
-  return {n:l.length,nf:sum('nf'),paros:sum('paros'),veces:sum('veces'),paroTot:sum('paroTot'),perdido:sum('perdido'),prog:cp.length?P:null,paroProg:cp.length?PP:null,perdPct,disp:P?Math.max(0,1-PP/P):null,sem:semaforo(perdPct),
+  return {n:l.length,reinc:sum('reinc'),reparadas:sum('reparadas'),nf:sum('nf'),paros:sum('paros'),veces:sum('veces'),paroTot:sum('paroTot'),perdido:sum('perdido'),prog:cp.length?P:null,paroProg:cp.length?PP:null,perdPct,disp:P?Math.max(0,1-PP/P):null,sem:semaforo(perdPct),
     resp:[].concat(...l.map(x=>x.resp)),rep:[].concat(...l.map(x=>x.rep)),resueltas:sum('resueltas'),trabajos:sum('trabajos'),sinFin:sum('sinFin'),turnoH:sum('turnoH'),sinHorario:l.filter(x=>x.sinHorario).length,enCurso:l.some(x=>x.enCurso)}}
 function filtraMaq(f){return MAQ_TODAS.filter(m=>(m.vigente||REG.some(r=>r.equipo===m.id))&&(!f.area||m.area===f.area)&&(!f.linea||m.lineaNom===f.linea)&&(!f.maq||m.id===f.maq))}
 function calcular(a,b,f,now){now=now||Date.now();const maqs=filtraMaq(f).map(m=>calcMaq(m,a,b,now));
   const areas=[...new Set(maqs.map(x=>x.m.area))].map(ar=>{const ms_=maqs.filter(x=>x.m.area===ar);const lineas=[...new Set(ms_.map(x=>x.m.lineaNom))].map(li=>{const l=ms_.filter(x=>x.m.lineaNom===li);return {linea:li,maqs:l,t:agregar(l)}});return {area:ar,lineas,maqs:ms_,t:agregar(ms_)}});
   return {a,b,now,maqs,areas,t:agregar(maqs)}}
-function mecanicos(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{if(!r.atendidoPor)return;const k=r.atendidoPor;const o=g[k]||(g[k]={nombre:k,n:0,resp:[],rep:[],paros:0});o.n++;const t=tiempos(r);if(t.resp!=null&&t.resp>=0)o.resp.push(t.resp);if(t.rep!=null&&t.rep>=0)o.rep.push(t.rep);if(lineaDetenida(r)==='Detenida')o.paros++}));return Object.values(g).sort((a,b)=>b.n-a.n)}
+function mecanicos(D){const g={},RC=mapaReinc(),get=k=>g[k]||(g[k]={nombre:k,n:0,resp:[],rep:[],paros:0,reparadas:0,reinc:0});
+  D.maqs.forEach(x=>x.fallas.forEach(r=>{if(r.atendidoPor){const o=get(r.atendidoPor);o.n++;const t=tiempos(r);if(t.resp!=null&&t.resp>=0)o.resp.push(t.resp);if(t.rep!=null&&t.rep>=0)o.rep.push(t.rep);if(lineaDetenida(r)==='Detenida')o.paros++;if(ms(r.finAtencion))o.reparadas++}
+    const rc=RC[r.id];if(rc)get(rc.prev.atendidoPor||'Sin registro').reinc++}));return Object.values(g).sort((a,b)=>b.n-a.n)}
+function listaReinc(D){const RC=mapaReinc();return [].concat(...D.maqs.map(x=>x.fallas.filter(r=>RC[r.id]).map(r=>({f:r,rc:RC[r.id],m:x.m})))).sort((a,b)=>msCreado(a.f)-msCreado(b.f))}
+const pctR=t=>t.reparadas?t.reinc/t.reparadas:null;
 function causas(D){const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{const k=r.tipoFalla||'Sin clasificar';const o=g[k]||(g[k]={tipo:k,n:0,ints:[]});o.n++;const i=intParo(r,D.now);if(i)o.ints.push([Math.max(i[0],D.a),Math.min(i[1],Math.min(D.b,D.now))])}));return Object.values(g).map(o=>Object.assign(o,{perdido:largo(unir(o.ints))})).sort((a,b)=>b.n-a.n||b.perdido-a.perdido)}
 function refsDe(r){if(Array.isArray(r.refaccionesUsadas)&&r.refaccionesUsadas.length)return r.refaccionesUsadas.map(x=>({nombre:x.nombre,codigo:x.codigo||'',cantidad:Number(x.cantidad)||0,unidad:x.unidad||'',id:x.id}));return r.refacciones?[{nombre:r.refacciones,codigo:'',cantidad:null,unidad:'',id:null}]:[]}
 function repetitivas(D,min){min=min||2;const g={};D.maqs.forEach(x=>x.fallas.forEach(r=>{const k=x.m.id+'|'+(r.tipoFalla||'Sin clasificar');const o=g[k]||(g[k]={m:x.m,tipo:r.tipoFalla||'Sin clasificar',n:0,ints:[],mec:new Set(),refs:{}});o.n++;if(r.atendidoPor)o.mec.add(r.atendidoPor);
@@ -1122,7 +1181,8 @@ V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea
   ${kpiE(T.nf,'Reportes de falla',delta(T.nf,A&&A.nf,true,x=>String(x)))}
   ${kpiE(pct(T.disp),'Disponibilidad general',delta(T.disp,A&&A.disp,false,x=>(Math.round(x*1000)/10)+' pts'),T.sem?'k'+T.sem:'')}
   ${kpiE(durN(prom(T.resp)),'Tiempo promedio de respuesta',delta(prom(T.resp),A&&prom(A.resp),true,durMin))}
-  ${kpiE(durN(prom(T.rep)),'Tiempo promedio de reparación',delta(prom(T.rep),A&&prom(A.rep),true,durMin))}</div>
+  ${kpiE(durN(prom(T.rep)),'Tiempo promedio de reparación',delta(prom(T.rep),A&&prom(A.rep),true,durMin))}
+  ${kpiE(T.reinc+(T.reparadas?` <small style="font-size:15px">(${pct(pctR(T))})</small>`:''),'🔁 Reincidencias (de las reparaciones)',delta(T.reinc,A&&A.reinc,true,x=>String(x)),T.reinc?'kbad':'')}</div>
   <div class="card"><h2>Semáforo por área, línea y máquina</h2><p class="muted" style="margin-top:-4px">🟢 pierde menos del ${umbrales().verde}% de sus horas programadas · 🟡 del ${umbrales().verde}% a menos del ${umbrales().rojo}% · 🔴 ${umbrales().rojo}% o más. Meta: disponibilidad mayor a 80%.</p>
   <div class="scroll"><table class="semtab"><thead><tr><th>Área / línea / máquina</th><th>Reportes</th><th>Paros</th><th>Tiempo perdido</th><th>Resp. prom.</th><th>Disponibilidad</th><th>Semáforo</th></tr></thead><tbody>
   ${D.areas.map(ar=>filaSem(0,'<b>'+esc(ar.area)+'</b>',ar.t)+ar.lineas.map(li=>filaSem(1,esc(li.linea),li.t)+li.maqs.map(x=>filaSem(2,esc(x.m.nombre),x)).join('')).join('')).join('')}
@@ -1136,7 +1196,7 @@ V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea
     ${[['Horas de paro',h1(A.perdido)+' h',h1(T.perdido)+' h',delta(T.perdido,A.perdido,true,durMin)],['Fallas',A.nf,T.nf,delta(T.nf,A.nf,true,String)],['Paros reales',A.veces,T.veces,delta(T.veces,A.veces,true,String)],['Disponibilidad',pct(A.disp),pct(T.disp),delta(T.disp,A.disp,false,x=>(Math.round(x*1000)/10)+' pts')],['Respuesta prom.',durN(prom(A.resp)),durN(prom(T.resp)),delta(prom(T.resp),prom(A.resp),true,durMin)]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num"><b>${r[2]}</b></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">El historial completo no tiene periodo anterior para comparar.</p>'}</div>
   <div class="card"><h2>Evolución semanal (últimas ${sem.length} semanas)</h2>${lineaSVG(sem)}</div>
   <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.lineaNom)}</b> <small class="muted">${esc(x.m.area)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s) ${pillSem(x.sem)}</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
-  <div class="card"><h2>Intervenciones por mecánico</h2>${mec.length?`<div class="scroll"><table><thead><tr><th>Mecánico</th><th>Intervenciones</th><th>Resp. prom.</th><th>Reparación prom.</th></tr></thead><tbody>${mec.map(x=>`<tr><td>${esc(x.nombre)}</td><td class="num">${x.n}</td><td class="num">${durN(prom(x.resp))}</td><td class="num">${durN(prom(x.rep))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Sin intervenciones en el periodo.</p>'}</div></div>
+  <div class="card"><h2>Intervenciones por mecánico</h2>${mec.length?`<div class="scroll"><table><thead><tr><th>Mecánico</th><th>Intervenciones</th><th>Resp. prom.</th><th>Reparación prom.</th><th>Reincidencias</th></tr></thead><tbody>${mec.map(x=>`<tr${x.reinc?' class="s-amarillo"':''}><td>${esc(x.nombre)}</td><td class="num">${x.n}</td><td class="num">${durN(prom(x.resp))}</td><td class="num">${durN(prom(x.rep))}</td><td class="num">${x.reinc}${x.reparadas?` <small class="muted">(${pct(x.reinc/x.reparadas)})</small>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Sin intervenciones en el periodo.</p>'}</div></div>
   <div class="card"><h2>🔁 Fallas repetitivas</h2>${rep.length?`<div class="scroll"><table><thead><tr><th>Máquina</th><th>Tipo de falla</th><th>Veces</th><th>Tiempo perdido</th><th>Mecánicos</th><th>Refacciones</th></tr></thead><tbody>${rep.map(o=>`<tr class="${o.n>=3?'s-rojo':'s-amarillo'}"><td>${esc(o.m.nombre+' · '+o.m.lineaNom)}</td><td>${esc(o.tipo)}</td><td class="num"><b>${o.n}</b></td><td class="num">${o.perdido?durMin(o.perdido):'0 min'}</td><td>${esc(o.mecTxt)}</td><td><small>${esc(o.refTxt)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No hay fallas que se repitan (mismo tipo en la misma máquina) en el periodo.</p>'}</div>
   <p class="muted"><small>Tiempo de respuesta: del reporte a que el mecánico empieza. Reparación: de que empieza a que termina. Paro: del reporte a que la línea vuelve a producir; si hay reportes al mismo tiempo en una máquina, el tiempo se cuenta una sola vez. Las fallas que no detuvieron la línea cuentan como reportes, pero no como tiempo perdido. N/D = dato no disponible.</small></p>`};
 function enlazarEjecutivo(){if(vista!=='ejecutivo')return;
@@ -1179,12 +1239,13 @@ async function descargarExcel(P,f){
     ['Reportes de falla',T.nf,A&&A.nf,'0',-1],['Otros trabajos de mantenimiento (preventivos, etc.)',T.trabajos,A&&A.trabajos,'0','n'],['Reportes que detuvieron la línea',T.paros,A&&A.paros,'0',-1],['Paros reales (veces que se detuvo)',T.veces,A&&A.veces,'0',-1],
     ['Tiempo de producción perdido por paros (h)',h1(T.perdido),A&&h1(A.perdido),H,-1],['Horas programadas de operación (h)',h1(T.prog),A&&h1(A.prog),H,'n'],
     ['Tiempo promedio de respuesta (min)',m1(prom(T.resp)),A&&m1(prom(A.resp)),M,-1],['Tiempo promedio de reparación (min)',m1(prom(T.rep)),A&&m1(prom(A.rep)),M,-1],
-    ['Disponibilidad',T.disp,A&&A.disp,PC,1],['Fallas solucionadas (cerradas)',T.nf?T.resueltas/T.nf:null,A&&(A.nf?A.resueltas/A.nf:null),PC,1]];
+    ['Disponibilidad',T.disp,A&&A.disp,PC,1],['Fallas solucionadas (cerradas)',T.nf?T.resueltas/T.nf:null,A&&(A.nf?A.resueltas/A.nf:null),PC,1],
+    ['🔁 Reincidencias (volvió a fallar tras la reparación)',T.reinc,A&&A.reinc,'0',-1],['🔁 % de reparaciones con reincidencia',pctR(T),A&&pctR(A),PC,-1]];
   lin.forEach((l,i)=>{const r=5+i,row=fila(ws,r,[l[0],l[1],pv&&l[4]!=='n'?l[2]:'',null,''],[null,l[3],l[3]]);row.getCell(1).font={bold:true};
     if(pv&&l[4]!=='n'){row.getCell(4).value={formula:`IF(OR(ISTEXT(B${r}),ISTEXT(C${r}),C${r}=""),"",B${r}-C${r})`};row.getCell(4).numFmt=l[3];
       row.getCell(5).value={formula:`IF(D${r}="","",IF(D${r}=0,"= Igual",IF(D${r}*${l[4]}>0,"✔ Mejoró","✖ Empeoró")))`};row.getCell(5).font={bold:true};row.getCell(4).font={}}else{row.getCell(4).value='';row.getCell(5).value=''}});
   const rD=5+lin.findIndex(l=>l[0]==='Disponibilidad');ws.getCell(rD,2).font={bold:true,size:12};
-  ws.addConditionalFormatting({ref:'E5:E17',rules:[{type:'containsText',operator:'containsText',text:'Mejoró',style:{font:{color:{argb:'FF006100'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFC6EFCE'}}},priority:1},{type:'containsText',operator:'containsText',text:'Empeoró',style:{font:{color:{argb:'FF9C0006'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFC7CE'}}},priority:2}]});
+  ws.addConditionalFormatting({ref:`E5:E${4+lin.length}`,rules:[{type:'containsText',operator:'containsText',text:'Mejoró',style:{font:{color:{argb:'FF006100'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFC6EFCE'}}},priority:1},{type:'containsText',operator:'containsText',text:'Empeoró',style:{font:{color:{argb:'FF9C0006'},bold:true},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFC7CE'}}},priority:2}]});
   let r=5+lin.length+1;ws.getCell(r,1).value='Semáforo general del periodo';ws.getCell(r,1).font={bold:true};pintaSem(ws.getCell(r,2),T.sem);ws.mergeCells(r,2,r,3);
   r+=1;ws.getCell(r,1).value=`Verde: pierde menos del ${umbrales().verde}% de las horas programadas · Amarillo: del ${umbrales().verde}% a menos del ${umbrales().rojo}% · Rojo: ${umbrales().rojo}% o más. Meta de disponibilidad: más de 80%.`;ws.mergeCells(r,1,r,5);ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF55606B'}};ws.getCell(r,1).alignment={wrapText:true};ws.getRow(r).height=28;
   // Top 5 y fallas más frecuentes (a la derecha)
@@ -1198,50 +1259,68 @@ async function descargarExcel(P,f){
   ws.views=[{showGridLines:false,state:'frozen',ySplit:3}];
 
   // 2. Resumen por área y línea
-  ws=hoja('Área y línea',[16,22,12,12,13,14,16,16,16,16,22],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Resumen por área y línea',sub,11);
-  encab(ws,4,['Área','Línea','Máquinas','Reportes de falla','Paros reales (veces)','Reportes con paro','Horas programadas','Horas de paro (tiempo perdido)','Resp. promedio (min)','Disponibilidad','Semáforo']);
+  ws=hoja('Área y línea',[16,22,12,12,13,14,16,16,16,16,22,14],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Resumen por área y línea',sub,12);
+  encab(ws,4,['Área','Línea','Máquinas','Reportes de falla','Paros reales (veces)','Reportes con paro','Horas programadas','Horas de paro (tiempo perdido)','Resp. promedio (min)','Disponibilidad','Semáforo','🔁 Reincidencias']);
   r=5;const areaFilas=[];
-  D.areas.forEach(ar=>{const ra=r;areaFilas.push(ra);const lr=[];r++;ar.lineas.forEach(li=>{lr.push(r);const row=fila(ws,r,['',li.linea,li.maqs.length,li.t.nf,li.t.veces,li.t.paros,h1(li.t.prog),h1(li.t.perdido),m1(prom(li.t.resp)),li.t.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);row.outlineLevel=1;pintaSem(row.getCell(11),li.t.sem);row.getCell(11).border=borde;r++});
-    const row=fila(ws,ra,[ar.area,'Todas',null,null,null,null,h1(ar.t.prog),null,m1(prom(ar.t.resp)),ar.t.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);
-    [3,4,5,6,8].forEach(c=>{row.getCell(c).value={formula:`SUM(${colL(c)}${lr[0]}:${colL(c)}${lr[lr.length-1]})`};row.getCell(c).numFmt=c===8?H:'0';row.getCell(c).font={bold:true}});
+  D.areas.forEach(ar=>{const ra=r;areaFilas.push(ra);const lr=[];r++;ar.lineas.forEach(li=>{lr.push(r);const row=fila(ws,r,['',li.linea,li.maqs.length,li.t.nf,li.t.veces,li.t.paros,h1(li.t.prog),h1(li.t.perdido),m1(prom(li.t.resp)),li.t.disp,'',li.t.reinc],[null,null,'0','0','0','0',H,H,M,PC,null,'0']);row.outlineLevel=1;pintaSem(row.getCell(11),li.t.sem);row.getCell(11).border=borde;r++});
+    const row=fila(ws,ra,[ar.area,'Todas',null,null,null,null,h1(ar.t.prog),null,m1(prom(ar.t.resp)),ar.t.disp,'',null],[null,null,'0','0','0','0',H,H,M,PC]);
+    [3,4,5,6,8,12].forEach(c=>{row.getCell(c).value={formula:`SUM(${colL(c)}${lr[0]}:${colL(c)}${lr[lr.length-1]})`};row.getCell(c).numFmt=c===8?H:'0';row.getCell(c).font={bold:true}});
     row.eachCell(c=>{c.fill=c.fill||{type:'pattern',pattern:'solid',fgColor:{argb:XC.azulS}};c.font=Object.assign({},c.font||{},{bold:true})});pintaSem(row.getCell(11),ar.t.sem);row.getCell(11).border=borde;resumenes[ws._n]=(resumenes[ws._n]||[]).concat(ra)});
-  {const row=fila(ws,r,['Total general','',null,null,null,null,h1(T.prog),null,m1(prom(T.resp)),T.disp,''],[null,null,'0','0','0','0',H,H,M,PC]);[3,4,5,6,8].forEach(c=>{row.getCell(c).value={formula:areaFilas.map(x=>colL(c)+x).join('+')||'0'};row.getCell(c).numFmt=c===8?H:'0'});row.eachCell(c=>{c.font={bold:true,color:{argb:XC.blanco}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azul}}});pintaSem(row.getCell(11),T.sem)}
-  const rTot=r;r+=2;ws.getCell(r,1).value='La disponibilidad de cada área y línea se calcula con las horas programadas de sus máquinas (no es el promedio de porcentajes). Las horas de paro sí se suman. Usa los botones 1 y 2 de la izquierda para contraer o expandir las líneas.';ws.mergeCells(r,1,r,11);ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF55606B'}};ws.getCell(r,1).alignment={wrapText:true};ws.getRow(r).height=30;
+  {const row=fila(ws,r,['Total general','',null,null,null,null,h1(T.prog),null,m1(prom(T.resp)),T.disp,'',null],[null,null,'0','0','0','0',H,H,M,PC]);[3,4,5,6,8,12].forEach(c=>{row.getCell(c).value={formula:areaFilas.map(x=>colL(c)+x).join('+')||'0'};row.getCell(c).numFmt=c===8?H:'0'});row.eachCell(c=>{c.font={bold:true,color:{argb:XC.blanco}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azul}}});pintaSem(row.getCell(11),T.sem)}
+  const rTot=r;r+=2;ws.getCell(r,1).value='La disponibilidad de cada área y línea se calcula con las horas programadas de sus máquinas (no es el promedio de porcentajes). Las horas de paro sí se suman. Usa los botones 1 y 2 de la izquierda para contraer o expandir las líneas.';ws.mergeCells(r,1,r,12);ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF55606B'}};ws.getCell(r,1).alignment={wrapText:true};ws.getRow(r).height=30;
   const lineasAll=[].concat(...D.areas.map(ar=>ar.lineas.map(li=>({n:li.linea+' · '+ar.area,t:li.t}))));
   const rl=r+2;encab(ws,rl,['Línea','Horas de paro']);lineasAll.forEach((x,i)=>{fila(ws,rl+1+i,[x.n,h1(x.t.perdido)],[null,H])});
   if(lineasAll.length)graficas.push({ws,tipo:'bar',titulo:'Horas de paro por línea',cat:{ref:ref(ws,1,rl+1,1,rl+lineasAll.length),vals:lineasAll.map(x=>x.n)},series:[{nombre:'Horas de paro',ref:ref(ws,2,rl+1,2,rl+lineasAll.length),vals:lineasAll.map(x=>h1(x.t.perdido)),color:'1D4F9C',colores:lineasAll.map(x=>x.t.sem?XSEM[x.t.sem].g:'1D4F9C')}],desde:[3,rl-1],hasta:[10,rl+16]});
   ws.views=[{showGridLines:false,state:'frozen',ySplit:4}];
 
   // 3. Desglose por máquina (renglones expandibles)
-  ws=hoja('Desglose por máquina',[30,13,13,30,22,24,18,13,13,13,30,11,34,12,16,14],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Desglose por máquina · toca el botón + de la izquierda para ver cada reporte',sub,16);
-  encab(ws,4,['Máquina','Área','Línea','Horas programadas','Horas de paro','Veces que se detuvo','Reportes levantados','Resp. prom. (min)','Rep. prom. (min)','Disponibilidad','Semáforo','Turnos QR (h)','Reportes con paro','Sin hora de reanudación','Otros trabajos','Fallas cerradas']);
+  ws=hoja('Desglose por máquina',[30,13,13,30,22,24,18,13,13,13,30,11,34,12,16,14,26],{properties:{outlineLevelRow:1}});ws.properties.outlineProperties={summaryBelow:false};titulo(ws,'Desglose por máquina · toca el botón + de la izquierda para ver cada reporte',sub,17);
+  encab(ws,4,['Máquina','Área','Línea','Horas programadas','Horas de paro','Veces que se detuvo','Reportes levantados','Resp. prom. (min)','Rep. prom. (min)','Disponibilidad','Semáforo','Turnos QR (h)','Reportes con paro','Sin hora de reanudación','Otros trabajos','Fallas cerradas','🔁 Reincidencias']);
   r=5;
-  D.maqs.forEach(x=>{const row=fila(ws,r,[nomM(x.m),x.m.area,x.m.lineaNom,h1(x.prog),h1(x.perdido),x.veces,x.nf,m1(prom(x.resp)),m1(prom(x.rep)),x.disp,'',h1(x.turnoH),x.paros,x.sinFin,x.trabajos,x.resueltas],[null,null,null,H,H,'0','0',M,M,PC,null,H,'0','0','0','0']);
+  D.maqs.forEach(x=>{const row=fila(ws,r,[nomM(x.m),x.m.area,x.m.lineaNom,h1(x.prog),h1(x.perdido),x.veces,x.nf,m1(prom(x.resp)),m1(prom(x.rep)),x.disp,'',h1(x.turnoH),x.paros,x.sinFin,x.trabajos,x.resueltas,x.reinc],[null,null,null,H,H,'0','0',M,M,PC,null,H,'0','0','0','0','0']);
     row.eachCell(c=>{c.font=Object.assign({},c.font||{},{bold:true});c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XC.azulS}}});pintaSem(row.getCell(11),x.sem);row.getCell(11).border=borde;row.height=22;resumenes[ws._n]=(resumenes[ws._n]||[]).concat(r);r++;
     const regs=x.regs.slice().sort((p,q)=>msReg(p)-msReg(q));
-    const h=encab(ws,r,['Fecha','Hora del reporte','Tipo','Descripción del problema','Tipo de falla','Causa de la falla','Mecánico que atendió','Respuesta (min)','Reparación (min)','Paro real (min)','Refacciones utilizadas','Cantidad','Trabajo realizado','Hora de solución','¿Línea detenida?','Estado'],'FF5B6B7E');h.outlineLevel=1;h.hidden=true;h.height=30;r++;
+    const h=encab(ws,r,['Fecha','Hora del reporte','Tipo','Descripción del problema','Tipo de falla','Causa de la falla','Mecánico que atendió','Respuesta (min)','Reparación (min)','Paro real (min)','Refacciones utilizadas','Cantidad','Trabajo realizado','Hora de solución','¿Línea detenida?','Estado','🔁 Reincidencia'],'FF5B6B7E');h.outlineLevel=1;h.hidden=true;h.height=30;r++;
     if(!regs.length){const e=fila(ws,r,['Sin reportes en el periodo']);e.outlineLevel=1;e.hidden=true;r++}
-    regs.forEach(rg=>{const t=tiempos(rg),ip=intParo(rg,now),refs=refsDe(rg),cant=refs.reduce((s,z)=>z.cantidad==null?s:s+(z.cantidad||0),0),sol=ms(rg.finAtencion);
-      const e=fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',esFalla(rg)?(rg.tipoFalla||null):'—',rg.causa||null,rg.atendidoPor||(!esFalla(rg)?rg.tecnico:null)||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),refs.map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad+(z.unidad?' '+z.unidad:''):z.nombre).join(', ')||'—',refs.length?(refs.some(z=>z.cantidad!=null)?cant:null):0,rg.trabajoRealizado||rg.observaciones||(esFalla(rg)?null:'—'),sol?fechaX(sol):(esFalla(rg)?null:'—'),lineaDetenida(rg),rg.estado||''],[FE,HO,null,null,null,null,null,M,M,M,null,'0',null,HO]);
-      e.outlineLevel=1;e.hidden=true;if(ip&&ip[2]==='curso')e.getCell(10).note='Paro en curso: se cuenta hasta la hora de generación del reporte';if(ip&&ip[2]==='prov')e.getCell(10).note='Provisional: falta que la operadora confirme; se usó la hora en que terminó el mecánico';r++})});
+    const RC=mapaReinc();
+    regs.forEach(rg=>{const rc=RC[rg.id],t=tiempos(rg),ip=intParo(rg,now),refs=refsDe(rg),cant=refs.reduce((s,z)=>z.cantidad==null?s:s+(z.cantidad||0),0),sol=ms(rg.finAtencion);
+      const e=fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',esFalla(rg)?(rg.tipoFalla||null):'—',rg.causa||null,rg.atendidoPor||(!esFalla(rg)?rg.tecnico:null)||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),refs.map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad+(z.unidad?' '+z.unidad:''):z.nombre).join(', ')||'—',refs.length?(refs.some(z=>z.cantidad!=null)?cant:null):0,rg.trabajoRealizado||rg.observaciones||(esFalla(rg)?null:'—'),sol?fechaX(sol):(esFalla(rg)?null:'—'),lineaDetenida(rg),rg.estado||'',rc?`Sí · ${rc.min} min después de la reparación de ${rc.prev.atendidoPor||'—'}`:'—'],[FE,HO,null,null,null,null,null,M,M,M,null,'0',null,HO]);
+      e.outlineLevel=1;e.hidden=true;if(rc){e.getCell(17).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM.rojo.f}};e.getCell(17).font={bold:true,color:{argb:XSEM.rojo.t}}}if(ip&&ip[2]==='curso')e.getCell(10).note='Paro en curso: se cuenta hasta la hora de generación del reporte';if(ip&&ip[2]==='prov')e.getCell(10).note='Provisional: falta que la operadora confirme; se usó la hora en que terminó el mecánico';r++})});
   ws.views=[{showGridLines:false,state:'frozen',ySplit:4,xSplit:1}];
 
   // 4. Intervenciones (lista completa con filtros)
-  ws=hoja('Intervenciones',[12,8,24,13,11,18,30,22,22,18,12,12,12,12,30,34,12,15,14,18,14],{});titulo(ws,'Intervenciones del periodo (con filtros)',sub,21);
-  const cols=['Fecha','Hora','Máquina','Área','Línea','Tipo','Descripción','Tipo de falla','Causa','Mecánico / responsable','Respuesta (min)','Reparación (min)','Paro real (min)','Paro contado (min)','Refacciones','Trabajo realizado','Hora solución','¿Línea detenida?','Estado','Reportó','Confirmó'];encab(ws,4,cols);
+  ws=hoja('Intervenciones',[12,8,24,13,11,18,30,22,22,18,12,12,12,12,30,34,12,15,14,18,14,30],{});titulo(ws,'Intervenciones del periodo (con filtros)',sub,22);
+  const cols=['Fecha','Hora','Máquina','Área','Línea','Tipo','Descripción','Tipo de falla','Causa','Mecánico / responsable','Respuesta (min)','Reparación (min)','Paro real (min)','Paro contado (min)','Refacciones','Trabajo realizado','Hora solución','¿Línea detenida?','Estado','Reportó','Confirmó','🔁 Reincidencia'];encab(ws,4,cols);const RCi=mapaReinc();
   const todos=[].concat(...D.maqs.map(x=>x.regs.map(rg=>({x,rg})))).sort((p,q)=>msReg(p.rg)-msReg(q.rg));r=5;
   todos.forEach(({x,rg})=>{const t=tiempos(rg),ip=intParo(rg,now);let cont=null;if(ip){const a=Math.max(ip[0],P.a),b=Math.min(ip[1],fin);cont=b>a?m1(b-a):0}
-    fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),x.m.nombre+' · '+x.m.lineaNom,x.m.area,x.m.lineaNom,esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',rg.tipoFalla||'—',rg.causa||null,rg.atendidoPor||rg.tecnico||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),ip?cont:(lineaDetenida(rg)==='Detenida'?null:0),refsDe(rg).map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad:z.nombre).join(', ')||'—',rg.trabajoRealizado||'—',ms(rg.finAtencion)?fechaX(ms(rg.finAtencion)):'—',lineaDetenida(rg),rg.estado||'',esFalla(rg)?rg.tecnico||'':'—',rg.confirmadoPor||'—'],[FE,HO,null,null,null,null,null,null,null,null,M,M,M,M,null,null,HO]);r++});
+    fila(ws,r,[fechaX(msReg(rg)),fechaX(msReg(rg)),x.m.nombre+' · '+x.m.lineaNom,x.m.area,x.m.lineaNom,esFalla(rg)?'Falla':rg.tipo,rg.actividad||'',rg.tipoFalla||'—',rg.causa||null,rg.atendidoPor||rg.tecnico||null,esFalla(rg)?m1(t.resp):'—',esFalla(rg)?m1(t.rep):(Number(rg.minutos)||null),ip?m1(ip[1]-ip[0]):(lineaDetenida(rg)==='Detenida'?null:0),ip?cont:(lineaDetenida(rg)==='Detenida'?null:0),refsDe(rg).map(z=>z.cantidad!=null?z.nombre+' ×'+z.cantidad:z.nombre).join(', ')||'—',rg.trabajoRealizado||'—',ms(rg.finAtencion)?fechaX(ms(rg.finAtencion)):'—',lineaDetenida(rg),rg.estado||'',esFalla(rg)?rg.tecnico||'':'—',rg.confirmadoPor||'—',RCi[rg.id]?`Sí · ${RCi[rg.id].min} min después (reparó ${RCi[rg.id].prev.atendidoPor||'—'})`:'—'],[FE,HO,null,null,null,null,null,null,null,null,M,M,M,M,null,null,HO]);r++});
   if(todos.length)ws.autoFilter={from:{row:4,column:1},to:{row:4+todos.length,column:cols.length}};else fila(ws,5,['Sin intervenciones en el periodo']);
   if(todos.length){const rr=r+1;ws.getCell(rr,13).value='Total (min)';ws.getCell(rr,13).font={bold:true};ws.getCell(rr,14).value={formula:`SUBTOTAL(9,N5:N${r-1})`};ws.getCell(rr,14).numFmt=M;ws.getCell(rr,14).font={bold:true}}
   ws.views=[{showGridLines:false,state:'frozen',ySplit:4}];
 
   // 5. Mecánicos
-  const mec=mecanicos(D);ws=hoja('Mecánicos',[28,16,18,18,18],{});titulo(ws,'Tiempos de respuesta y reparación por mecánico',sub,5);
-  encab(ws,4,['Mecánico','Intervenciones','Resp. promedio (min)','Reparación promedio (min)','Paros atendidos']);
-  mec.forEach((x,i)=>fila(ws,5+i,[x.nombre,x.n,m1(prom(x.resp)),m1(prom(x.rep)),x.paros],[null,'0',M,M,'0']));
-  if(mec.length){const rr=5+mec.length;const row=fila(ws,rr,['Total / promedio general',{formula:`SUM(B5:B${rr-1})`},m1(prom(T.resp)),m1(prom(T.rep)),{formula:`SUM(E5:E${rr-1})`}],[null,'0',M,M,'0']);row.eachCell(c=>c.font={bold:true});
-    graficas.push({ws,tipo:'bar',titulo:'Intervenciones por mecánico',cat:{ref:ref(ws,1,5,1,4+mec.length),vals:mec.map(x=>x.nombre)},series:[{nombre:'Intervenciones',ref:ref(ws,2,5,2,4+mec.length),vals:mec.map(x=>x.n),color:'1D4F9C'}],desde:[0,rr+1],hasta:[4,rr+18]})}else fila(ws,5,['Sin intervenciones en el periodo']);
+  const mec=mecanicos(D);ws=hoja('Mecánicos',[28,16,18,18,16,16,16,18],{});titulo(ws,'Tiempos de respuesta, reparación y reincidencias por mecánico',sub,8);
+  encab(ws,4,['Mecánico','Intervenciones','Resp. promedio (min)','Reparación promedio (min)','Paros atendidos','Reparaciones terminadas','🔁 Reincidencias','% con reincidencia']);
+  mec.forEach((x,i)=>{const rr=5+i,row=fila(ws,rr,[x.nombre,x.n,m1(prom(x.resp)),m1(prom(x.rep)),x.paros,x.reparadas,x.reinc,null],[null,'0',M,M,'0','0','0']);row.getCell(8).value={formula:`IF(F${rr}=0,"N/D",G${rr}/F${rr})`};row.getCell(8).numFmt=PC;if(x.reinc){row.getCell(7).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM.rojo.f}};row.getCell(7).font={bold:true,color:{argb:XSEM.rojo.t}}}});
+  if(mec.length){const rr=5+mec.length;const row=fila(ws,rr,['Total / promedio general',{formula:`SUM(B5:B${rr-1})`},m1(prom(T.resp)),m1(prom(T.rep)),{formula:`SUM(E5:E${rr-1})`},{formula:`SUM(F5:F${rr-1})`},{formula:`SUM(G5:G${rr-1})`},{formula:`IF(F${rr}=0,"N/D",G${rr}/F${rr})`}],[null,'0',M,M,'0','0','0',PC]);row.eachCell(c=>c.font={bold:true});row.getCell(8).numFmt=PC;
+    graficas.push({ws,tipo:'bar',titulo:'Intervenciones por mecánico',cat:{ref:ref(ws,1,5,1,4+mec.length),vals:mec.map(x=>x.nombre)},series:[{nombre:'Intervenciones',ref:ref(ws,2,5,2,4+mec.length),vals:mec.map(x=>x.n),color:'1D4F9C'},{nombre:'Reincidencias',ref:ref(ws,7,5,7,4+mec.length),vals:mec.map(x=>x.reinc),color:'C8102E'}],desde:[0,rr+1],hasta:[5,rr+19]})}else fila(ws,5,['Sin intervenciones en el periodo']);
+
+  // 5b. Reincidencias
+  {const lr=listaReinc(D);ws=hoja('Reincidencias',[32,16,22,26,22,16,14,12,26,28,36],{});titulo(ws,`Reincidencias: la máquina volvió a fallar en menos de ${REINC_MIN} min tras la reparación, o la operadora indicó en la revisión de los ${SEGUNDA_MIN} min que sigue fallando`,sub,11);
+   let rr=4;
+   const kpiRow=fila(ws,rr,['Reincidencias en el periodo',T.reinc,'Reparaciones terminadas',T.reparadas,'% con reincidencia',pctR(T)],[null,'0',null,'0',null,PC]);kpiRow.eachCell(c=>c.font={bold:true});kpiRow.height=24;if(T.reinc){kpiRow.getCell(2).fill={type:'pattern',pattern:'solid',fgColor:{argb:XSEM.rojo.f}};kpiRow.getCell(2).font={bold:true,size:13,color:{argb:XSEM.rojo.t}}}rr+=2;
+   const porM=D.maqs.filter(x=>x.reinc).sort((a,b)=>b.reinc-a.reinc).map(x=>[x.m.nombre+' · '+x.m.lineaNom,x.m.area,x.m.lineaNom,x.reparadas,x.reinc,x.reparadas?x.reinc/x.reparadas:null]);
+   encab(ws,rr,['Por máquina','Área','Línea','Reparaciones','🔁 Reincidencias','% con reincidencia']);rr++;const rm=rr;porM.forEach(v=>{fila(ws,rr,v,[null,null,null,'0','0',PC]);rr++});if(!porM.length){fila(ws,rr,['Sin reincidencias en el periodo']);rr++}
+   const rmF=rr-1;
+   rr++;const lns=[].concat(...D.areas.map(ar=>ar.lineas.filter(li=>li.t.reinc).map(li=>[li.linea,ar.area,li.t.reparadas,li.t.reinc,pctR(li.t)])));
+   encab(ws,rr,['Por línea','Área','Reparaciones','🔁 Reincidencias','% con reincidencia']);rr++;lns.forEach(v=>{fila(ws,rr,v,[null,null,'0','0',PC]);rr++});if(!lns.length){fila(ws,rr,['Sin reincidencias en el periodo']);rr++}
+   rr++;const mr=mec.filter(x=>x.reinc).sort((a,b)=>b.reinc-a.reinc).map(x=>[x.nombre,x.reparadas,x.reinc,x.reparadas?x.reinc/x.reparadas:null]);
+   encab(ws,rr,['Por mecánico (quien hizo la reparación)','Reparaciones','🔁 Reincidencias','% con reincidencia']);rr++;mr.forEach(v=>{fila(ws,rr,v,[null,'0','0',PC]);rr++});if(!mr.length){fila(ws,rr,['Sin reincidencias en el periodo']);rr++}
+   rr++;encab(ws,rr,['Máquina','Área','Línea','Falla original','Mecánico que reparó','Terminó','Volvió a fallar','Minutos después','Nueva falla','Cómo se detectó','Trabajo realizado en la reparación']);const rh=rr;rr++;
+   lr.forEach(({f,rc,m})=>{const fin=ms(rc.prev.finAtencion);fila(ws,rr,[m.nombre+' · '+m.lineaNom,m.area,m.lineaNom,rc.prev.tipoFalla||'—',rc.prev.atendidoPor||null,fin?fechaX(fin):null,fechaX(msCreado(f)),rc.min,f.tipoFalla||'—',rc.via,rc.prev.trabajoRealizado||null],[null,null,null,null,null,'dd/mm hh:mm','dd/mm hh:mm','0']);rr++});
+   if(lr.length)ws.autoFilter={from:{row:rh,column:1},to:{row:rr-1,column:11}};else{fila(ws,rr,['Sin reincidencias en el periodo']);rr++}
+   if(porM.length)graficas.push({ws,tipo:'bar',titulo:'Reincidencias por máquina',cat:{ref:ref(ws,1,rm,1,rmF),vals:porM.map(v=>v[0])},series:[{nombre:'Reincidencias',ref:ref(ws,5,rm,5,rmF),vals:porM.map(v=>v[4]),color:'C8102E'}],desde:[0,rr+1],hasta:[5,rr+18]});
+   ws.views=[{showGridLines:false}]}
 
   // 6. Fallas repetitivas
   const rep=repetitivas(D);ws=hoja('Fallas repetitivas',[30,14,12,28,14,16,30,40],{});titulo(ws,'Fallas repetitivas (mismo tipo de falla en la misma máquina, 2 veces o más)',sub,8);
@@ -1282,7 +1361,7 @@ async function descargarExcel(P,f){
    ['Paros simultáneos','Si una máquina tiene varios reportes con paro al mismo tiempo, los minutos se cuentan una sola vez. «Veces que se detuvo» cuenta los paros reales; «Reportes con paro» cuenta los reportes.'],['Fallas sin paro','Cuentan como reporte de mantenimiento, pero no suman tiempo perdido de producción.'],
    ['Horas programadas','Salen del horario configurado de cada máquina (días y turnos). Solo cuentan las horas transcurridas hasta el momento de la descarga. Para fechas anteriores al primer horario guardado se usa ese primer horario.'],['Tiempo perdido','Horas de paro dentro del horario programado. Si la máquina no tiene horario, se cuenta todo el paro y su disponibilidad aparece como N/D.'],
    ['Disponibilidad','(Horas programadas − horas de paro dentro del horario) ÷ horas programadas. En áreas y líneas se suman las horas de sus máquinas; no se promedian porcentajes.'],['Semáforo',`Verde: pierde menos del ${umbrales().verde}% · Amarillo: del ${umbrales().verde}% a menos del ${umbrales().rojo}% · Rojo: ${umbrales().rojo}% o más (configurable por el administrador).`],
-   ['Comparación','Se compara contra el periodo anterior de la misma duración (por ejemplo, esta semana hasta hoy contra los mismos días de la semana pasada).'],['N/D','Dato no disponible: el registro no tiene la información necesaria. No se inventan datos.'],['Historial','Descargar el reporte no borra ni modifica ningún registro de la plataforma.']].forEach((l,i)=>{const row=fila(ws,4+i,l);row.getCell(1).font={bold:true};row.height=34});
+   [`Reincidencia`,`La misma máquina vuelve a fallar en menos de ${REINC_MIN} minutos después de que el mecánico terminó la reparación, o la operadora indica en la revisión de los ${SEGUNDA_MIN} minutos que volvió a fallar. Se cuenta al mecánico que hizo la reparación anterior.`],['Comparación','Se compara contra el periodo anterior de la misma duración (por ejemplo, esta semana hasta hoy contra los mismos días de la semana pasada).'],['N/D','Dato no disponible: el registro no tiene la información necesaria. No se inventan datos.'],['Historial','Descargar el reporte no borra ni modifica ningún registro de la plataforma.']].forEach((l,i)=>{const row=fila(ws,4+i,l);row.getCell(1).font={bold:true};row.height=34});
 
   let buf=await wb.xlsx.writeBuffer();buf=await agregarGraficas(buf,graficas,resumenes);
   const nombre=`Mantenimiento La Josefina ${P.todo?'historial completo':iso(new Date(P.a))+' a '+iso(new Date(Math.min(P.b,now+1)-1))}.xlsx`;
@@ -1321,7 +1400,7 @@ async function agregarGraficas(buf,graficas,resumenes){const zip=await JSZip.loa
 
 // ===== Turnos con QR =====
 function puedeTurno(){return activoP()&&['Operador',PRINCIPAL].includes(perfil.rol)}
-function verTurnos(){return activoP()&&[PRINCIPAL,'Supervisor de mantenimiento','Dirección','Gerencia','Coordinación'].includes(perfil.rol)}
+function verTurnos(){return activoP()&&([PRINCIPAL,'Supervisor de mantenimiento','Dirección','Gerencia','Coordinación'].includes(perfil.rol)||(Array.isArray(perfil.vistas)&&(perfil.vistas.includes('ejecutivo')||perfil.vistas.includes('reportes'))))}
 function miTurnoAbierto(){return usuario?TURNOS.find(t=>t.operadorUid===usuario.uid&&t.estado==='Abierto'):null}
 function txtTurno(t){return t?`${esc(t.nombre)} (${hhmm(t.a)}–${hhmm(t.b)})`:'Fuera del horario programado'}
 function tarjetaTurno(){if(!puedeTurno())return '';const ab=miTurnoAbierto();const eq=maqFija||(misLineas()&&misLineas().length===1?misLineas()[0]:null);
@@ -1477,8 +1556,8 @@ function enlazarRed(){if(vista!=='red')return;if(!RED.ip)consultarMiIp();
 // ===== Reportes (Administrador principal) =====
 V.reportes=()=>`<div class="card"><h2>📥 Reportes en Excel</h2><p class="muted">Incluyen resumen ejecutivo, semáforo, desglose por máquina, mecánicos, fallas repetitivas, refacciones y comparación semanal. Descargar no modifica el historial.</p>
   <div class="acciones"><button data-xlsr="semana">Esta semana</button><button class="sec" data-xlsr="anterior">Semana anterior</button><button class="sec" data-xlsr="7d">Últimos 7 días</button><button class="sec" data-xlsr="todo">Historial completo</button></div>
-  <p class="muted">Para otra semana, un rango de fechas o filtrar por área, línea o máquina, usa el <button class="mini sec" data-v2="ejecutivo">Tablero ejecutivo</button>.</p><div id="xlsMsg"></div></div>
-  <div class="card"><h2>🗄️ Respaldo</h2><p>Firebase guarda una <b>copia completa de la base de datos cada domingo</b> y conserva las últimas 8 semanas.</p><div class="acciones"><button class="sec" id="descargarRespaldo">Descargar respaldo ahora</button></div><p class="muted">Incluye trabajos, fallas, calendario, máquinas, inventario y usuarios (sin contraseñas ni fotos).</p></div>`;
+  ${vistasPermitidas().includes('ejecutivo')?'<p class="muted">Para otra semana, un rango de fechas o filtrar por área, línea o máquina, usa el <button class="mini sec" data-v2="ejecutivo">Tablero ejecutivo</button>.</p>':''}<div id="xlsMsg"></div></div>
+  ${esPrincipal()?`<div class="card"><h2>🗄️ Respaldo</h2><p>Firebase guarda una <b>copia completa de la base de datos cada domingo</b> y conserva las últimas 8 semanas.</p><div class="acciones"><button class="sec" id="descargarRespaldo">Descargar respaldo ahora</button></div><p class="muted">Incluye trabajos, fallas, calendario, máquinas, inventario y usuarios (sin contraseñas ni fotos).</p></div>`:''}`;
 function enlazarReportes(){document.querySelectorAll('[data-xlsr]').forEach(b=>b.onclick=async()=>{const bs=document.querySelectorAll('[data-xlsr]');bs.forEach(x=>x.disabled=true);$('xlsMsg').innerHTML='<p class="muted">Preparando el Excel…</p>';
   try{const n=await descargarExcel(periodo({per:b.dataset.xlsr}),{});$('xlsMsg').innerHTML=`<p class="muted">✅ Se descargó «${esc(n)}».</p>`}catch(e){$('xlsMsg').innerHTML=`<p class="error">${esc(e.message||String(e))}</p>`}bs.forEach(x=>x.disabled=false)})}
 
@@ -1540,7 +1619,7 @@ function enlazar(){
     try{const batch=db.batch();for(let i=0;i<veces;i++)batch.set(db.collection('programa').doc(),{equipo:$('p_maq').value,fecha:sumarDias(fe,rep*i),actividad:$('p_act').value.trim(),responsable:$('p_resp').value.trim(),estado:'Programado',creadoEn:TS()});await batch.commit();
       diaSel=fe;calMes=new Date(aFecha(fe).getFullYear(),aFecha(fe).getMonth(),1);toast(veces>1?veces+' mantenimientos programados.':'Mantenimiento programado.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}};
   const fc=$('fCfg');if(fc)fc.onsubmit=async ev=>{ev.preventDefault();try{await db.collection('maquinas').doc(maqSel).set({frecuenciaDias:$('frec').value},{merge:true});toast('Frecuencia guardada.');render(true)}catch(e){toast(errTxt(e))}};
-  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML=opcionesLineaUsr(pl.value,'todas')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
+  const fu=$('fUsr');if(fu){fu.onsubmit=guardarUsuario;enlazarPermisos();const ar=$('u_rol'),au=$('u_num'),nuevo=!fu.dataset.uid,hint=()=>{const r=RANGOS[ar.value],n=Number(au.value);$('u_hint').textContent=r&&au.value&&(n<r[0]||n>r[1])?'⚠️ Este número no está en el rango de '+ar.value+' ('+r[0]+'–'+r[1]+').':''};ar.onchange=()=>{if(nuevo)au.value=siguienteNumero(ar.value);hint()};const pl=$('u_planta'),ln=$('u_linea');pl.onchange=()=>{ln.innerHTML=opcionesLineaUsr(pl.value,'todas')};au.oninput=hint;hint();$('cancelUsr').onclick=()=>{usrEdit=null;usrAlta=false;render(true)}}
   const fr=$('fReset');if(fr)fr.onsubmit=async ev=>{ev.preventDefault();const b=fr.querySelector('button');b.disabled=true;$('rErr').innerHTML='';try{await llamar('restablecerContrasena',{uid:fr.dataset.uid,contrasena:$('r_pass').value});toast('Contraseña restablecida.');$('r_pass').value=''}catch(e){$('rErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`}b.disabled=false};
   const ub=$('u_buscar');if(ub)ub.oninput=()=>{usrFiltro=ub.value;clearTimeout(ub._t);ub._t=setTimeout(()=>{render(true);const n=$('u_buscar');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)};
   const hp=$('hacerPrincipal');if(hp)hp.onclick=async()=>{hp.disabled=true;try{await db.collection('usuarios').doc(usuario.uid).update({rol:PRINCIPAL});toast('Tu cuenta ahora es Administrador principal.')}catch(e){$('hpErr').innerHTML=`<p class="error">${e&&e.code==='permission-denied'?'Firebase rechazó el cambio: primero publica las reglas nuevas en Firestore → Reglas.':esc(errTxt(e))}</p>`;hp.disabled=false}};
@@ -1575,7 +1654,7 @@ function enlazar(){
 }
 async function guardarUsuario(ev){ev.preventDefault();const f=ev.target,b=f.querySelector('button[type=submit]');b.disabled=true;$('uErr').innerHTML='';
   const uid=f.dataset.uid,num=$('u_num').value.trim();
-  const datos={nombre:$('u_nom').value.trim(),numEmpleado:num,rol:$('u_rol').value,planta:$('u_planta').value,linea:$('u_linea').value,activo:$('u_act').value==='1'};if($('u_libre'))datos.accesoLibre=$('u_libre').checked;
+  const datos={nombre:$('u_nom').value.trim(),numEmpleado:num,rol:$('u_rol').value,planta:$('u_planta').value,linea:$('u_linea').value,activo:$('u_act').value==='1'};if($('u_libre'))datos.accesoLibre=$('u_libre').checked;{const pv=leerPermisos(datos.rol);if(pv!==undefined)datos.vistas=pv}
   if(num&&!/^[0-9]{1,10}$/.test(num)){$('uErr').innerHTML='<p class="error">El número de empleado solo puede tener dígitos.</p>';b.disabled=false;return}
   try{
     if(uid){await db.collection('usuarios').doc(uid).update(Object.assign(datos,{modificadoPor:usuario.uid,modificadoEn:TS()}));usrEdit=null;toast('Datos de '+datos.nombre+' actualizados.');render(true);return}

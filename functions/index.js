@@ -124,7 +124,7 @@ async function destinosPara(equipo, n, roles) {
 }
 async function avisar(r, id, n) {
   const m = await maqInfo(r.equipo);
-  const titulo = (n > 1 ? '🚨🚨 SIN ATENDER (' + n + '/' + MAX_AVISOS + ') ' : '🚨 ') + 'Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
+  const titulo = (n > 1 ? '🚨🚨 SIN ATENDER (' + n + '/' + MAX_AVISOS + ') ' : '🚨 ') + (r.reincidenciaDe ? '🔁 Reincidencia · ' : '') + 'Falla en ' + (m.planta ? m.planta + ' · ' : '') + m.zona + (r.severidad === 'Paro de línea' ? ' (línea detenida)' : '');
   const cuerpo = (r.tipoFalla || 'Falla') + ' — ' + String(r.actividad || '').slice(0, 140) + ' · Reportó ' + (r.tecnico || '');
   return enviar(await destinosPara(r.equipo, n), mensaje(titulo, cuerpo, URL_BASE + '#alertas', 'falla-' + id + '-' + n));
 }
@@ -239,6 +239,7 @@ exports.crearUsuario = onCall(async (req) => {
     nombre: String(d.nombre || '').trim().slice(0, 80), usuario, numEmpleado: String(d.numEmpleado || ''), rol,
     planta: String(d.planta || ''), linea: String(d.linea || 'todas'), activo: d.activo !== false,
     accesoLibre: yo.rol === PRINCIPAL && d.accesoLibre === true,
+    vistas: yo.rol === PRINCIPAL && Array.isArray(d.vistas) ? d.vistas.filter(x => typeof x === 'string').slice(0, 30) : null,
     creadoPor: req.auth.uid, creadoEn: FieldValue.serverTimestamp(),
   });
   return { uid: nuevo.uid };

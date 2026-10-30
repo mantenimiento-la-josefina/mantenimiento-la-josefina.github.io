@@ -219,6 +219,10 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .cathead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.cathead h2,.cathead h3{margin:0}.catlin{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0}.catmaq{gap:10px}.catform{background:var(--accent-soft);margin:10px 0}.selmaqsel{max-width:420px}
 .permisos{border:1px solid var(--accent-line);border-radius:12px;padding:10px 14px;margin:12px 0;background:var(--accent-soft)}.permisos legend{font-weight:700;padding:0 6px}
 .permgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px}.permgrid .chk{margin:2px 0;font-weight:500;display:flex;align-items:center;gap:8px}.permgrid .chk input{width:auto;margin:0;flex:0 0 auto;min-height:0}
+.asis .chat{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px;margin:12px 0;max-height:420px;min-height:160px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 12px;border-radius:14px;line-height:1.45}.msg.yo{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}.msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg ol,.msg ul{margin:6px 0;padding-left:20px}.msg .ref{margin-top:8px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}.msg.escribiendo{color:var(--muted);font-style:italic}
+.sugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.sugs button{text-align:left}
 </style>
 </head>
 <body>
@@ -301,9 +305,9 @@ const EN_ATENCION = ['En atención','En proceso'];
 const TIPOS = ['Preventivo','Correctivo','Inspección','Lubricación','Limpieza'];
 const TIPOS_FALLA = ['Sellado (horizontal o vertical)','Corte de bolsa','Dosificación / llenado','Arrastre o tensión de película','Fechador / impresión','Atasco de producto','Eléctrica','Neumática / aire','Sensor o fotocelda','Otra'];
 const VISTAS = {
-  principal:['panel','ejecutivo','catalogo','red','reportes','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
+  principal:['panel','ejecutivo','catalogo','red','reportes','asistente','alertas','maquinas','ficha','registrar','falla','trabajos','abiertos','calendario','indicadores','usuarios','tablero','pantalla','inventario','cuenta'],
   'Administrador':['usuarios','cuenta'],
-  direccion:['ejecutivo','tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
+  direccion:['ejecutivo','asistente','tablero','alertas','indicadores','trabajos','abiertos','panel','maquinas','ficha','calendario','usuarios','pantalla','inventario','cuenta'],
   coordinacion:['tablero','alertas','indicadores','ficha','cuenta'],
   'Supervisor de mantenimiento':['alertas','tablero','abiertos','trabajos','historial','indicadores','maquinas','ficha','calendario','registrar','pantalla','inventario','cuenta'],
   'Mecánico':['alertas','maquinas','ficha','registrar','falla','historial','pantalla','inventario','cuenta'],
@@ -313,7 +317,7 @@ const VISTAS = {
 const NAV = {
   principal:[['panel','Panel principal'],['ejecutivo','📊 Tablero ejecutivo'],['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['indicadores','Indicadores'],['usuarios','👥 Administración de usuarios'],['tablero','🟢 Tablero de producción'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Administrador':[['usuarios','👥 Alta de usuarios']],
-  direccion:[['ejecutivo','📊 Tablero ejecutivo'],['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios'],['inventario','📦 Inventario']],
+  direccion:[['ejecutivo','📊 Tablero ejecutivo'],['asistente','🤖 Asistente (demo)'],['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['panel','Panel principal'],['maquinas','Máquinas'],['calendario','Calendario'],['usuarios','👥 Alta de usuarios'],['inventario','📦 Inventario']],
   coordinacion:[['tablero','🟢 Tablero de producción'],['alertas','🚨 Fallas en vivo'],['indicadores','Indicadores']],
   'Supervisor de mantenimiento':[['alertas','🚨 Fallas en vivo'],['tablero','🟢 Tablero de producción'],['abiertos','Trabajos abiertos'],['trabajos','Trabajos registrados'],['historial','Historial'],['indicadores','Indicadores'],['maquinas','Máquinas'],['calendario','Calendario'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
   'Mecánico':[['alertas','🚨 Fallas en vivo'],['maquinas','Máquinas'],['registrar','Registrar trabajo'],['falla','Reportar falla'],['historial','Historial'],['pantalla','Pantalla de mantenimiento'],['inventario','📦 Inventario']],
@@ -381,7 +385,7 @@ function conAlertas(){return atiende()||avisa()||recibeEsc()}
 function puedeRegistrar(){return esPrincipal()||esMecanico()}
 function insiste(){return esMecanico()}
 // ===== Permisos por persona: qué secciones ve cada quien (lo decide el Administrador principal) =====
-const SECCIONES=[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones'],['alertas','🚨 Fallas en vivo'],['pantalla','Pantalla de mantenimiento'],['tablero','🟢 Tablero de producción'],['ejecutivo','📊 Tablero ejecutivo'],['indicadores','Indicadores'],['reportes','📥 Reportes en Excel'],['panel','Panel principal'],['maquinas','Máquinas y fichas'],['registrar','Registrar trabajo'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['inventario','📦 Inventario']];
+const SECCIONES=[['falla','🚨 Reportar falla'],['historial','📋 Historial de ajustes y reparaciones'],['alertas','🚨 Fallas en vivo'],['pantalla','Pantalla de mantenimiento'],['tablero','🟢 Tablero de producción'],['ejecutivo','📊 Tablero ejecutivo'],['indicadores','Indicadores'],['reportes','📥 Reportes en Excel'],['panel','Panel principal'],['maquinas','Máquinas y fichas'],['registrar','Registrar trabajo'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario'],['inventario','📦 Inventario'],['asistente','🤖 Asistente de mantenimiento (demo)']];
 const CLAVES_SEC=SECCIONES.map(s=>s[0]);
 function grupoDeRol(rol){return rol===PRINCIPAL?'principal':['Dirección','Gerencia'].includes(rol)?'direccion':rol==='Coordinación'?'coordinacion':rol}
 function vistasDefecto(rol){return VISTAS[grupoDeRol(rol)]||['cuenta']}
@@ -1588,6 +1592,28 @@ function enlazarRed(){if(vista!=='red')return;if(!RED.ip)consultarMiIp();
   document.querySelectorAll('[data-libre]').forEach(b=>b.onclick=async()=>{const u=USUARIOS.find(x=>x.uid===b.dataset.uid),dar=b.dataset.libre==='1';if(!u)return;b.disabled=true;
     try{await db.collection('usuarios').doc(u.uid).update({accesoLibre:dar,modificadoPor:usuario.uid,modificadoEn:TS()});if(dar)redBusca='';toast(dar?'🌐 '+u.nombre+' ya puede entrar desde cualquier red.':'Se quitó el permiso a '+u.nombre+'.');render(true)}catch(e){toast(errTxt(e));b.disabled=false}})}
 
+// ===== Asistente de mantenimiento (DEMOSTRACIÓN: respuestas preparadas, no usa IA ni cobra) =====
+const DEMO_QA=[
+ {q:'El detector de metales no detecta la pieza de prueba, ¿qué reviso?',a:`Revisa en este orden:<ol><li><b>Sensibilidad:</b> confirma que el producto cargado sea el correcto; un producto equivocado baja la sensibilidad.</li><li><b>Pieza de prueba:</b> pásala por el centro de la apertura, no por las orillas.</li><li><b>Aprendizaje del producto:</b> si cambió el producto o el empaque, vuelve a hacer el «aprendizaje».</li><li><b>Interferencias:</b> metal cerca de la apertura, motores o radios.</li></ol>Si después de esto no detecta, detén la línea y repórtalo como <b>«No detecta»</b>; no debe seguir produciendo.`,ref:'Manual del detector · Sección 6 «Pruebas de verificación», pág. 41'},
+ {q:'La envasadora no sella bien la bolsa (sello abierto)',a:`Causas más comunes, de la más rápida a la más lenta de revisar:<ol><li><b>Temperatura:</b> compara la temperatura real contra la programada para esa película.</li><li><b>Teflón</b> quemado o roto en las mordazas.</li><li><b>Presión de mordaza</b> desajustada o mordazas desalineadas.</li><li><b>Resistencia</b> dañada: mide continuidad.</li></ol>En el historial de esta línea, las últimas 3 fallas de sellado se resolvieron cambiando la resistencia.`,ref:'Manual de la envasadora · Capítulo 5 «Sistema de sellado», págs. 58–63'},
+ {q:'La bolsa sale cortada chueca o no se corta',a:`<ol><li>Revisa el <b>filo de la cuchilla</b> y que no tenga residuos de producto.</li><li>Verifica la <b>fotocelda de registro</b>: si no lee la marca, el corte se desfasa.</li><li>Revisa la <b>tensión de la película</b> y el arrastre.</li><li>Confirma el <b>largo de bolsa</b> programado.</li></ol>`,ref:'Manual de la envasadora · Capítulo 7 «Corte», pág. 77'},
+ {q:'La báscula da pesos fuera de rango',a:`<ol><li>Haz el <b>cero</b> de la báscula con las tolvas vacías.</li><li>Revisa que no haya producto pegado en las compuertas.</li><li>Verifica la <b>vibración</b> de los alimentadores: si es muy alta, entra producto de más.</li><li>Si sigue, calíbrala con las pesas patrón.</li></ol>`,ref:'Manual de la báscula · Sección 4 «Calibración», pág. 22'},
+ {q:'¿Cada cuánto se lubrica la envasadora?',a:`Según el manual:<ul><li><b>Diario:</b> guías de mordazas y cadenas de arrastre.</li><li><b>Semanal:</b> rodamientos del eje de mordazas.</li><li><b>Mensual:</b> reductores (revisar nivel de aceite).</li></ul>Puedes programarlo en el <b>Calendario</b> para que aparezca como preventivo.`,ref:'Manual de la envasadora · Capítulo 9 «Lubricación», pág. 95'}];
+let DEMO_CHAT=[];
+V.asistente=()=>`<div class="card asis"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">🤖 Pregúntale al asistente</h2><span class="tag warn">DEMOSTRACIÓN</span></div>
+  <p class="muted">Ejemplo de cómo funcionaría: el mecánico pregunta y el asistente contesta con base en el manual y el historial de la máquina. <b>Esta versión usa respuestas preparadas y no tiene costo.</b></p>
+  <label for="asisMaq">Máquina</label><select id="asisMaq">${opcionesAgrupadas(maqSel)}</select>
+  <div class="chat" id="chat">${DEMO_CHAT.length?DEMO_CHAT.map(m=>m.yo?`<div class="msg yo">${esc(m.t)}</div>`:`<div class="msg bot">${m.t}${m.ref?`<div class="ref">📖 ${esc(m.ref)}</div>`:''}</div>`).join(''):'<p class="muted" style="text-align:center;margin:30px 0">Toca una pregunta de ejemplo para ver la respuesta.</p>'}</div>
+  <div class="sugs">${DEMO_QA.map((x,i)=>`<button class="mini sec" data-demoq="${i}">${esc(x.q)}</button>`).join('')}</div>
+  <form id="fAsis" class="dos" style="grid-template-columns:1fr auto;align-items:end"><input id="asisTxt" maxlength="300" placeholder="Escribe tu pregunta…" autocomplete="off"><button type="submit">Enviar</button></form>
+  ${DEMO_CHAT.length?'<div class="acciones"><button class="mini sec" id="asisLimpiar">Borrar conversación</button></div>':''}</div>`;
+function enlazarAsistente(){if(vista!=='asistente')return;const c=$('chat');if(c)c.scrollTop=c.scrollHeight;
+  const sm=$('asisMaq');if(sm)sm.onchange=()=>{maqSel=sm.value};
+  const resp=(yo,bot)=>{DEMO_CHAT.push({yo:true,t:yo});render(true);const ch=$('chat');if(ch){ch.insertAdjacentHTML('beforeend','<div class="msg bot escribiendo">Escribiendo…</div>');ch.scrollTop=ch.scrollHeight}setTimeout(()=>{DEMO_CHAT.push(bot);render(true)},900)};
+  document.querySelectorAll('[data-demoq]').forEach(b=>b.onclick=()=>{const x=DEMO_QA[Number(b.dataset.demoq)];resp(x.q,{t:x.a,ref:x.ref})});
+  const f=$('fAsis');if(f)f.onsubmit=ev=>{ev.preventDefault();const t=$('asisTxt').value.trim();if(!t)return;resp(t,{t:'Esta es una <b>demostración</b>: solo contesta las preguntas de ejemplo. En la versión completa respondería cualquier pregunta usando el manual de la máquina y su historial de reparaciones.'})};
+  const l=$('asisLimpiar');if(l)l.onclick=()=>{DEMO_CHAT=[];render(true)}}
+
 // ===== Reportes (Administrador principal) =====
 V.reportes=()=>`<div class="card"><h2>📥 Reportes en Excel</h2><p class="muted">Incluyen resumen ejecutivo, semáforo, desglose por máquina, mecánicos, fallas repetitivas, refacciones y comparación semanal. Descargar no modifica el historial.</p>
   <div class="acciones"><button data-xlsr="semana">Esta semana</button><button class="sec" data-xlsr="anterior">Semana anterior</button><button class="sec" data-xlsr="7d">Últimos 7 días</button><button class="sec" data-xlsr="todo">Historial completo</button></div>
@@ -1600,6 +1626,7 @@ function enlazarReportes(){document.querySelectorAll('[data-xlsr]').forEach(b=>b
 const MENU_PRINCIPAL=[
   ['🚨 Operación',[['panel','Panel principal'],['alertas','Fallas en vivo'],['falla','Reportar falla'],['tablero','Tablero de producción'],['pantalla','Pantalla de mantenimiento']]],
   ['📊 Indicadores',[['ejecutivo','Tablero ejecutivo'],['indicadores','Indicadores']]],
+  ['🤖 Asistente',[['asistente','Pregúntale al asistente (demo)']]],
   ['🔧 Mantenimiento',[['registrar','Registrar trabajo'],['trabajos','Trabajos registrados'],['abiertos','Trabajos abiertos'],['calendario','Calendario']]],
   ['🏭 Plantas y máquinas',[['catalogo','Plantas, líneas y máquinas'],['maquinas','Estado de máquinas, QR y horarios']]],
   ['👥 Usuarios',[['usuarios','Administración de usuarios']]],
@@ -1615,7 +1642,7 @@ function pintarMenuPrincipal(){const n=$('nav');if(!n)return;n.className='menu-p
 
 function pintarPlantasHeader(){const e=$('plantasHeader');if(e)e.textContent='Plantas '+PLANTAS.join(' · ')}
 function enlazar(){
-  enlazarEjecutivo();enlazarTurnos();enlazarCatalogo();enlazarRed();enlazarReportes();
+  enlazarEjecutivo();enlazarTurnos();enlazarCatalogo();enlazarRed();enlazarReportes();enlazarAsistente();
   const f=$('form');
   if(f)f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]');b.disabled=true;$('fErr').innerHTML='';
     const adm=esAdmin(),est=$('m_est').value;

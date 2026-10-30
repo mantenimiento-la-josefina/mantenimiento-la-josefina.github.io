@@ -279,7 +279,7 @@ function reconstruirCatalogo(){
     .sort((a,b)=>(PLANTAS_TODAS.findIndex(p=>p.nombre===a.planta)-PLANTAS_TODAS.findIndex(p=>p.nombre===b.planta))||((a.orden||0)-(b.orden||0))||cmpNat(a.nombre,b.nombre));
   LINEAS=LINEAS_TODAS.filter(l=>l.vigente);
   const mq={};MAQ_BASE.forEach(m=>mq[m.id]=Object.assign({activo:true,orden:0},m));
-  Object.entries(MAQCFG).forEach(([id,d])=>{if(mq[id]||d.nombre)mq[id]=Object.assign({activo:true,orden:0},mq[id]||{},{nombre:d.nombre||(mq[id]||{}).nombre,linea:d.linea||(mq[id]||{}).linea,codigo:d.codigo??(mq[id]||{}).codigo,incluye:d.incluye??(mq[id]||{}).incluye,activo:d.activo!==false&&(mq[id]||{activo:true}).activo!==false,orden:d.orden??(mq[id]||{}).orden??0},{id})});
+  Object.entries(MAQCFG).forEach(([id,d])=>{if(mq[id]||d.nombre)mq[id]=Object.assign({activo:true,orden:0},mq[id]||{},{nombre:d.nombre||(mq[id]||{}).nombre,linea:d.linea||(mq[id]||{}).linea,codigo:d.codigo??(mq[id]||{}).codigo,incluye:d.incluye??(mq[id]||{}).incluye,fallas:Array.isArray(d.fallas)?d.fallas:(mq[id]||{}).fallas,activo:d.activo!==false&&(mq[id]||{activo:true}).activo!==false,orden:d.orden??(mq[id]||{}).orden??0},{id})});
   const lo=id=>li[id]||{nombre:'Sin línea',planta:'',area:'',vigente:false};
   MAQ_TODAS=Object.values(mq).map(m=>{const l=lo(m.linea);return Object.assign(m,{lineaNom:l.nombre,planta:l.planta,area:l.area||l.planta,vigente:m.activo!==false&&!!l.vigente})});
   MAQ_TODAS.forEach(m=>{const her=MAQ_TODAS.filter(x=>x.linea===m.linea&&x.vigente);m.zona=m.lineaNom+(her.length>1||!m.vigente&&her.length?' · '+m.nombre:'')});
@@ -763,9 +763,37 @@ function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=
   ${mia&&finalizando===r.id?formFinalizar(r):''}</div>`}
 let REF=[],MOV=[],invFiltro='',invEdit=null,invAlta=false,importPrev=null;
 function refOpciones(){return REF.slice().sort((a,b)=>String(a.nombre).localeCompare(b.nombre)).map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}${x.codigo?' · '+esc(x.codigo):''} (hay ${Number(x.existencia)||0} ${esc(x.unidad||'')})</option>`).join('')}
-function selRefacciones(){if(!REF.length)return '';return `<div class="refsel"><label>Refacciones del inventario</label><div class="refrows"></div><button type="button" class="mini sec agregaRef">+ Agregar refacción usada</button><small class="muted" style="display:block;margin-top:4px">Se descuentan del inventario al guardar.</small></div>`}
-function filaRef(){return `<div class="refrow dos" style="grid-template-columns:1fr 90px auto;align-items:end"><div><select class="rf-id"><option value="">Elige la refacción…</option>${refOpciones()}</select></div><div><input class="rf-cant" type="number" inputmode="decimal" min="0.01" step="any" value="1" aria-label="Cantidad"></div><button type="button" class="mini peligro quitaRef" style="margin-bottom:2px">✕</button></div>`}
-function leerRefs(form){const out=[];form.querySelectorAll('.refrow').forEach(rw=>{const id=rw.querySelector('.rf-id').value,c=Number(rw.querySelector('.rf-cant').value);if(id&&c>0){const x=REF.find(y=>y.id===id);if(x)out.push({id,codigo:x.codigo||'',nombre:x.nombre,unidad:x.unidad||'',cantidad:c})}});return out}
+
+// ===== Fallas posibles por máquina (se sugieren según el nombre) =====
+const FALLAS_SUG=[
+  [/envasador|empacador|flow ?pack|vertical|horizontal/i,['Sellado (horizontal o vertical)','Corte de bolsa','Bolsa mal formada','Película atorada o rota','Arrastre o tensión de película','Falla de báscula','Dosificación / llenado','Falla de codificador','Desfase de fotocelda','Atasco de producto','Eléctrica','Neumática / aire']],
+  [/detector/i,['Falla de banda','No detecta','Rechazo falso','Falla del rechazador','Alarma o error en pantalla']],
+  [/b[aá]scula|pesador|multicabezal|combinatori/i,['Peso fuera de rango','Báscula descalibrada','Falla de vibrador','Compuertas atoradas','Alarma o error en pantalla']],
+  [/sellador|termosell/i,['No sella','Sello quemado o abierto','Falla de temperatura','Falla de banda','Eléctrica']],
+  [/codificador|fechador|impresor|inkjet|linx|diagraph|hitachi/i,['No imprime','Impresión borrosa','Falta de tinta o cinta','Error en pantalla']],
+  [/encintador/i,['No corta la cinta','Cinta atorada','Falla de banda','Falla de rodillos']],
+  [/horno|t[uú]nel|termoencog/i,['No calienta','Temperatura fuera de rango','Falla de banda','Eléctrica']],
+  [/llenador|tolva|dosificador/i,['Dosificación / llenado','Producto atorado','Falla de sensor de nivel','Neumática / aire']],
+  [/transportador|banda|elevador/i,['Banda atorada','Banda rota o desalineada','Falla de motor','Atasco de producto']],
+  [/emplayador/i,['Película rota','No corta la película','Falla de giro','Eléctrica']],
+  [/compresor|secador/i,['Baja presión','Fuga de aire','Sobrecalentamiento','Eléctrica']]];
+const FALLAS_GEN=['Falla mecánica','Eléctrica','Neumática / aire','Sensor o fotocelda','Atasco de producto','Alarma o error en pantalla'];
+function fallasSugeridas(nombre){const o=[];FALLAS_SUG.forEach(([re,l])=>{if(re.test(nombre||''))l.forEach(x=>{if(!o.includes(x))o.push(x)})});return o.length?o:FALLAS_GEN.slice()}
+function fallasDe(id){const m=maq(id);if(!m)return TIPOS_FALLA;return Array.isArray(m.fallas)&&m.fallas.length?m.fallas:fallasSugeridas(m.nombre)}
+function opcionesFalla(id,sel){const l=fallasDe(id).slice();if(sel&&!l.includes(sel))l.push(sel);return l.map(t=>`<option ${t===sel?'selected':''}>${esc(t)}</option>`).join('')}
+function selectFalla(id){return `<label for="f_tipo">Tipo de falla</label><select id="f_tipo" required ${id?'':'disabled'}><option value="" selected disabled>${id?'Selecciona el tipo de falla…':'Primero elige la máquina'}</option>${id?opcionesFalla(id)+'<option value="__otra">✏️ Otra (escribirla)</option>':''}</select>
+  <div id="f_otraBox" hidden><label for="f_otra">¿Qué falla es?</label><input id="f_otra" maxlength="80" placeholder="Escribe la falla en pocas palabras"></div>`}
+function maqDelForm(f){return ((f||document).querySelector('input[name=f_maq]:checked')||{}).value||($('f_maqsel')||{}).value||''}
+document.addEventListener('change',e=>{const ff=e.target.closest&&e.target.closest('#formFalla');if(!ff)return;
+  if(e.target.name==='f_maq'||e.target.id==='f_maqsel'){const box=$('f_tipoBox');if(box)box.innerHTML=selectFalla(maqDelForm(ff))}
+  if(e.target.id==='f_tipo'){const o=e.target.value==='__otra',b=$('f_otraBox'),i=$('f_otra');if(b)b.hidden=!o;if(i){i.required=o;if(o)i.focus()}}});
+function checksFallas(lista,marcadas){return lista.map(t=>`<label class="chk"><input type="checkbox" name="c_falla" value="${esc(t)}" ${marcadas.includes(t)?'checked':''}> ${esc(t)}</label>`).join('')}
+function pintarChecksFallas(){const box=$('c_fallasBox');if(!box)return;const nom=($('c_nom')||{}).value||'',prev=[...box.querySelectorAll('[name=c_falla]')],marc=prev.filter(x=>x.checked).map(x=>x.value),todas=prev.map(x=>x.value),tocado=box.dataset.tocado==='1';
+  const sug=fallasSugeridas(nom);if(!tocado){box.innerHTML=checksFallas(sug,sug);return}const extra=marc.filter(x=>!sug.includes(x));
+  box.innerHTML=checksFallas(sug.concat(extra),marc.concat(sug.filter(x=>!todas.includes(x))))}
+function selRefacciones(){if(!REF.length)return '';return `<div class="refsel"><label>Refacciones del inventario</label><div class="refrows">${filaRef()}</div><button type="button" class="mini sec agregaRef">+ Agregar otra refacción</button><small class="muted" style="display:block;margin-top:4px">Se descuentan del inventario al guardar.</small></div>`}
+function filaRef(){return `<div class="refrow dos" style="grid-template-columns:1fr 90px auto;align-items:end"><div><select class="rf-id"><option value="">Elige la refacción…</option>${refOpciones()}</select></div><div><select class="rf-cant" aria-label="Cantidad">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select></div><button type="button" class="mini peligro quitaRef" style="margin-bottom:2px">✕</button></div>`}
+function leerRefs(form){const out=[];form.querySelectorAll('.refrow').forEach(rw=>{const id=rw.querySelector('.rf-id').value,c=Number(rw.querySelector('.rf-cant').value);if(id&&c>0){const x=REF.find(y=>y.id===id);if(x){const y=out.find(z=>z.id===id);if(y)y.cantidad+=c;else out.push({id,codigo:x.codigo||'',nombre:x.nombre,unidad:x.unidad||'',cantidad:c})}}});return out}
 function faltante(lista){const x=lista.find(y=>{const z=REF.find(w=>w.id===y.id);return y.cantidad>(Number(z&&z.existencia)||0)});if(!x)return '';const z=REF.find(w=>w.id===x.id);return 'Solo hay '+(Number(z&&z.existencia)||0)+' '+(z&&z.unidad||'')+' de «'+x.nombre+'» en inventario. Corrige la cantidad o avisa al supervisor para que registre la entrada.'}
 function textoRefs(lista,libre){return [lista.map(x=>x.nombre+' ×'+x.cantidad+(x.unidad?' '+x.unidad:'')).join(', '),libre].filter(Boolean).join(' · ')}
 async function descontarRefs(lista,registroId,equipo){if(!lista.length)return;const batch=db.batch();
@@ -860,7 +888,7 @@ function formMant(){
   ${adm?`<div class="dos"><div><label for="m_fecha">Fecha</label><input id="m_fecha" type="date" required value="${esc(pf.fecha||hoy())}"></div><div><label for="m_tec">Responsable</label><input id="m_tec" required maxlength="120" value="${esc(pf.tecnico||perfil.nombre)}"></div></div>`
   :`<div class="dos"><div><label>Fecha</label><input value="${fmt(hoy())}" disabled></div><div><label>Responsable</label><input value="${esc(perfil.nombre)}" disabled></div></div>`}
   <label for="m_tipo">Tipo de trabajo</label><select id="m_tipo">${TIPOS.map(t=>`<option ${pf.tipo===t?'selected':''}>${t}</option>`).join('')}${fallaEd?'<option selected>Reporte de falla</option>':''}</select>
-  ${fallaEd?`<label for="m_tf">Tipo de falla</label><select id="m_tf">${TIPOS_FALLA.map(t=>`<option ${ed.tipoFalla===t?'selected':''}>${t}</option>`).join('')}</select>`:''}
+  ${fallaEd?`<label for="m_tf">Tipo de falla</label><select id="m_tf">${opcionesFalla(ed.equipo,ed.tipoFalla)}</select>`:''}
   <label for="m_act">${fallaEd?'Descripción del problema':'Descripción de las actividades realizadas'}</label><textarea id="m_act" required maxlength="2000">${esc(pf.actividad||'')}</textarea>
   ${fallaEd?`<label for="m_causa">Causa de la falla</label><input id="m_causa" maxlength="200" value="${esc(ed.causa||'')}"><label for="m_trab">Trabajo realizado</label><textarea id="m_trab" maxlength="2000">${esc(ed.trabajoRealizado||'')}</textarea><label for="m_aj">Ajustes efectuados</label><textarea id="m_aj" maxlength="2000">${esc(ed.ajustes||'')}</textarea>`:''}
   ${ed?'':selRefacciones()}<label for="m_ref">${!ed&&REF.length?'Otras refacciones (texto libre)':'Refacciones utilizadas'}</label><input id="m_ref" maxlength="250" value="${esc(pf.refacciones||'')}" placeholder="Ej. Resistencia de sellado, banda">
@@ -878,7 +906,7 @@ V.falla=()=>{const visibles=REG.filter(r=>esFalla(r)&&abierto(r)).sort((a,b)=>ms
     const lista=misLineas()&&misLineas().length?MAQUINAS.filter(m=>misLineas().includes(m.id)):MAQUINAS;
     if(lista.length<=6)return `<label>Máquina</label><div class="opciones">${lista.map(m=>`<label><input type="radio" name="f_maq" value="${m.id}" ${maqForm===m.id?'checked':''} required> ${esc(m.nombre)} · ${esc(m.lineaNom)}</label>`).join('')}</div>`;
     return `<label for="f_maqsel">Máquina</label><select id="f_maqsel" required>${opcionesMaq(maqForm,true)}</select>`})()}
-  <label for="f_tipo">Tipo de falla</label><select id="f_tipo" required><option value="" selected disabled>Selecciona el tipo de falla…</option>${TIPOS_FALLA.map(t=>`<option>${t}</option>`).join('')}</select>
+  <div id="f_tipoBox">${selectFalla(maqFija||(misLineas()&&misLineas().length===1&&!maqForm?misLineas()[0]:maqForm)||'')}</div>
   <label>¿La línea está detenida?</label><div class="opciones"><label><input type="radio" name="f_paro" value="si" required> Sí, está detenida</label><label><input type="radio" name="f_paro" value="no"> No, sigue trabajando</label></div>
   <label for="f_desc">Descripción del problema</label><textarea id="f_desc" required maxlength="2000" placeholder="Qué pasa, en qué parte de la máquina, qué se observa"></textarea>
   <label for="f_fotos">Fotografía (opcional, hasta 3)</label><input id="f_fotos" type="file" accept="image/*" multiple>
@@ -1466,6 +1494,9 @@ function formCat(){const e=catEdit;if(!e)return '';
     <div><label for="c_cod">Código de equipo</label><input id="c_cod" maxlength="30" value="${esc(m.codigo||'')}" placeholder="Ej. EQ A005" ${e.id?'':''}></div></div>
     <div class="dos"><div><label for="c_lin">Línea</label><select id="c_lin">${LINEAS.map(l=>`<option value="${esc(l.id)}" ${l.id===m.linea?'selected':''}>${esc(l.planta+' · '+l.nombre)}</option>`).join('')}</select></div>
     <div><label for="c_inc">Incluye <small class="muted">(opcional)</small></label><input id="c_inc" maxlength="120" value="${esc(m.incluye||'')}" placeholder="Ej. Báscula y codificador"></div></div>
+    <fieldset class="permisos"><legend>Fallas que verá la operadora</legend><p class="muted" style="margin:0 0 8px">Se sugieren según el nombre. Palomea las que apliquen. La operadora siempre tiene «Otra» para escribirla.</p>
+    <div class="permgrid" id="c_fallasBox" data-tocado="${e.id&&Array.isArray(m.fallas)?'1':''}">${(()=>{const sug=fallasSugeridas(m.nombre||''),act=e.id&&Array.isArray(m.fallas)&&m.fallas.length?m.fallas:sug;return checksFallas(sug.concat(act.filter(x=>!sug.includes(x))),act)})()}</div>
+    <div class="dos" style="grid-template-columns:1fr auto;align-items:end;margin-top:6px"><div><label for="c_nuevaFalla">Agregar otra falla</label><input id="c_nuevaFalla" maxlength="60" placeholder="Ej. Falla de rodillo"></div><button type="button" class="sec" id="c_addFalla">+ Agregar</button></div></fieldset>
     <p class="muted" style="margin:8px 0 0">Cada máquina tiene su propio código QR. Los equipos que van juntos (báscula, codificador) se anotan en «Incluye» para no darlos de alta por separado.</p>
     <div class="acciones"><button type="submit">Guardar</button><button type="button" class="sec" id="cancelCat">Cancelar</button></div><div id="cErr2"></div></form>`}
 function abiertasDe(ids){return REG.filter(r=>ids.includes(r.equipo)&&esFalla(r)&&abierto(r)).length}
@@ -1497,7 +1528,8 @@ async function guardarCat(ev){ev.preventDefault();const e=catEdit,f=$('fCat'),b=
     else{const lin=$('c_lin').value,cod=$('c_cod').value.trim();if(!lin)throw new Error('Primero agrega una línea.');
       if(cod&&MAQ_TODAS.some(m=>m.codigo&&m.codigo.replace(/\s/g,'').toUpperCase()===cod.replace(/\s/g,'').toUpperCase()&&m.id!==e.id))throw new Error('Ese código ya está dado de alta en otra máquina.');
       let id=e.id;if(!id){id=slug(cod)||('M-'+Date.now().toString(36).toUpperCase());while(maq(id))id+='-'+Math.floor(Math.random()*90+10)}
-      await db.collection('maquinas').doc(id).set({nombre:nom,codigo:cod,linea:lin,incluye:$('c_inc').value.trim(),activo:true},{merge:true})}
+      const fallas=[...document.querySelectorAll('#c_fallasBox [name=c_falla]:checked')].map(x=>x.value);if(!fallas.length)throw new Error('Palomea al menos una falla.');
+      await db.collection('maquinas').doc(id).set({nombre:nom,codigo:cod,linea:lin,incluye:$('c_inc').value.trim(),fallas,activo:true},{merge:true})}
     catEdit=null;toast('Guardado.');render(true)}catch(er){$('cErr2').innerHTML=`<p class="error">${esc(er.message||errTxt(er))}</p>`;b.disabled=false}}
 async function accionCat(acc,id){const [verbo,tipo]=acc.split('-');
   if(verbo==='add'){catEdit={tipo,padre:id};render(true);return}
@@ -1510,7 +1542,10 @@ async function accionCat(acc,id){const [verbo,tipo]=acc.split('-');
   else{const p=PLANTAS_TODAS.find(x=>x.id===id);if(!activo&&!confirm(`¿Dar de baja la planta «${p.nombre}» con todas sus líneas?\n\nEl historial se conserva.`))return;
     await db.collection('plantas').doc(id).set({nombre:p.nombre,activo,orden:p.orden??0},{merge:true})}
   toast(activo?'Reactivado.':'Dado de baja. El historial se conserva.')}
-function enlazarCatalogo(){const f=$('fCat');if(f)f.onsubmit=guardarCat;const c=$('cancelCat');if(c)c.onclick=()=>{catEdit=null;render(true)};
+function enlazarCatalogo(){const f=$('fCat');if(f)f.onsubmit=guardarCat;
+  const fb_=$('c_fallasBox');if(fb_){fb_.addEventListener('change',()=>fb_.dataset.tocado='1');const cn=$('c_nom');if(cn)cn.addEventListener('input',pintarChecksFallas);
+    const add=()=>{const i=$('c_nuevaFalla'),t=i.value.trim();if(!t)return;if(![...fb_.querySelectorAll('[name=c_falla]')].some(x=>x.value.toLowerCase()===t.toLowerCase()))fb_.insertAdjacentHTML('beforeend',checksFallas([t],[t]));else fb_.querySelectorAll('[name=c_falla]').forEach(x=>{if(x.value.toLowerCase()===t.toLowerCase())x.checked=true});fb_.dataset.tocado='1';i.value='';i.focus()};
+    $('c_addFalla').onclick=add;$('c_nuevaFalla').onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();add()}}}const c=$('cancelCat');if(c)c.onclick=()=>{catEdit=null;render(true)};
   const ap=$('catAddP');if(ap)ap.onclick=()=>{catEdit={tipo:'planta'};render(true)};const vb=$('catBajas');if(vb)vb.onclick=()=>{verBajas=!verBajas;render(true)};
   document.querySelectorAll('[data-cat]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await accionCat(b.dataset.cat,b.dataset.id)}catch(er){toast(errTxt(er))}b.disabled=false})}
 
@@ -1601,8 +1636,9 @@ function enlazar(){
   const ff=$('formFalla');
   if(ff)ff.onsubmit=async ev=>{ev.preventDefault();const b=ff.querySelector('button[type=submit]');b.disabled=true;b.textContent='Enviando…';$('fErr').innerHTML='';
     const eq=(ff.querySelector('input[name=f_maq]:checked')||{}).value||($('f_maqsel')||{}).value,paro=(ff.querySelector('input[name=f_paro]:checked')||{}).value==='si';
+    const otra=$('f_tipo').value==='__otra',tf=otra?$('f_otra').value.trim():$('f_tipo').value;if(!tf){$('fErr').innerHTML='<p class="error">Escribe qué falla es.</p>';b.disabled=false;b.textContent='Enviar reporte';return}
     try{const ref=db.collection('registros').doc();const fotos=await subirFotos($('f_fotos'),ref.id);
-      await ref.set({equipo:eq,tipo:'Reporte de falla',tipoFalla:$('f_tipo').value,fecha:hoy(),hora:horaAhora(),actividad:$('f_desc').value.trim(),severidad:paro?'Paro de línea':'Sin paro',paro:'',observaciones:'',estado:'Pendiente',tecnico:perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,refacciones:'',minutos:'',fotos,creadoEn:TS()});
+      await ref.set({equipo:eq,tipo:'Reporte de falla',tipoFalla:tf,tipoFallaOtra:otra,fecha:hoy(),hora:horaAhora(),actividad:$('f_desc').value.trim(),severidad:paro?'Paro de línea':'Sin paro',paro:'',observaciones:'',estado:'Pendiente',tecnico:perfil.nombre,tecnicoUid:usuario.uid,rol:perfil.rol,refacciones:'',minutos:'',fotos,creadoEn:TS()});
       maqForm=null;toast('✅ Falla enviada. Los mecánicos ya fueron avisados.');render(true)}
     catch(e){$('fErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false;b.textContent='Enviar reporte'}};
   const fz=$('fFinalizar');

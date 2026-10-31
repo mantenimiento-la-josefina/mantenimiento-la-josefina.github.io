@@ -235,6 +235,8 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .cont-flash.nulo{background:#8a939c;animation:contFlash .35s ease-out}
 @keyframes contFlash{from{opacity:.45}to{opacity:0}}
 html.modo-contador,body.modo-contador{overscroll-behavior:none}
+.cont-calc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 4px;text-align:center}.cont-calc>div:not([style]){border:1px solid var(--line);border-radius:12px;padding:10px 6px;background:var(--card)}
+.cont-calc span{display:block;font-size:12.5px;color:var(--muted)}.cont-calc b{font-size:24px;font-variant-numeric:tabular-nums;color:var(--fg)}.cont-calc .dest{border-color:var(--accent)}.cont-calc .dest b{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1658,13 +1660,20 @@ function pintarMenuPrincipal(){const n=$('nav');if(!n)return;n.className='menu-p
 function pintarPlantasHeader(){const e=$('plantasHeader');if(e)e.textContent='Plantas '+PLANTAS.join(' · ')}
 // ===== Contador por deslizamiento (experimento: solo en este teléfono, no usa Firebase) =====
 const CONT_KEY='dpc_contador',CONT_MIN=30;let contEntro=false;
+// Conteo verdadero: valor inicial 6, cada 52 acciones (sumas + restas + nulos) restan 1; total 312 acciones
+const CV_INI=6,CV_POR=52;
+function contCalc(c){const acc=c.s+c.r+c.z,rest=CV_INI-acc/CV_POR;return {acc,rest,cv:rest>0?c.n/rest:null}}
+function contCalcHtml(c){const k=contCalc(c);return `<div class="cont-calc" id="contCalc"><div><span>Cuenta normal</span><b id="cvN">${c.n}</b></div><div class="dest"><span>Conteo verdadero</span><b id="cvV">${k.cv==null?'—':k.cv.toFixed(2)}</b></div><div><span>Valor restante</span><b id="cvR">${Math.max(0,k.rest).toFixed(2)}</b></div>
+  <small class="muted" id="cvA" style="grid-column:1/-1">Acciones registradas: ${k.acc} de ${CV_INI*CV_POR}${k.rest<=0?' · valor restante en 0, no se divide':''}</small>
+  <div style="grid-column:1/-1"><button class="mini sec peligro" id="cvReset">Reiniciar todos los valores</button></div></div>`}
+function contCalcPintar(c){const b=$('contCalc');if(b)b.outerHTML=contCalcHtml(c);const r=$('cvReset');if(r)r.onclick=()=>{const x=$('contReset');if(x)x.click()}}
 function contLeer(){const d=LS.get(CONT_KEY,null);return d&&typeof d==='object'?{n:Number(d.n)||0,s:Number(d.s)||0,r:Number(d.r)||0,z:Number(d.z)||0}:{n:0,s:0,r:0,z:0}}
 V.contador=()=>{const c=contLeer();return `<div class="card contador"><div class="cont-cab"><h2 style="margin:0">👆 Contador</h2><span class="tag warn">EXPERIMENTO</span></div>
   <p class="muted" style="margin:6px 0 0">Desliza hacia arriba para sumar y hacia abajo para restar. Hacia los lados cuenta como nulo.</p>
   <div class="cont-zona" id="contZona"><div class="cont-num" id="contNum">${c.n}</div>
-  <div class="cont-stats"><span class="ok">▲ Sumas <b id="contS">${c.s}</b></span><span class="bad">▼ Restas <b id="contR">${c.r}</b></span><span class="nulo">↔ Nulos <b id="contZ">${c.z}</b></span></div></div>
+  <div class="cont-stats"><span class="ok">▲ Sumas <b id="contS">${c.s}</b></span><span class="bad">▼ Restas <b id="contR">${c.r}</b></span><span class="nulo">↔ Nulos <b id="contZ">${c.z}</b></span></div></div>${contCalcHtml(c)}
   <div class="acciones" style="justify-content:center"><button class="sec peligro" id="contReset">Reiniciar</button></div><div class="cont-flash" id="contFlash"></div></div>`};
-function contPintar(c){$('contNum').textContent=c.n;$('contS').textContent=c.s;$('contR').textContent=c.r;$('contZ').textContent=c.z}
+function contPintar(c){$('contNum').textContent=c.n;$('contS').textContent=c.s;$('contR').textContent=c.r;$('contZ').textContent=c.z;contCalcPintar(c)}
 function contFlash(tipo){const f=$('contFlash');if(!f)return;f.className='cont-flash';void f.offsetWidth;f.className='cont-flash '+tipo}
 function contMover(dx,dy){if(Math.max(Math.abs(dx),Math.abs(dy))<CONT_MIN)return;const c=contLeer();let t;
   if(Math.abs(dy)>Math.abs(dx)){if(dy<0){c.n++;c.s++;t='suma'}else{c.n--;c.r++;t='resta'}}else{c.z++;t='nulo'}
@@ -1676,6 +1685,7 @@ function enlazarContador(){const en=vista==='contador';document.documentElement.
   z.addEventListener('pointerdown',e=>{ini={x:e.clientX,y:e.clientY,id:e.pointerId};try{z.setPointerCapture(e.pointerId)}catch(er){}});
   z.addEventListener('pointerup',e=>{if(!ini||e.pointerId!==ini.id)return;const dx=e.clientX-ini.x,dy=e.clientY-ini.y;ini=null;contMover(dx,dy)});
   z.addEventListener('pointercancel',()=>{ini=null});
+  {const r=$('cvReset');if(r)r.onclick=()=>$('contReset').click()}
   $('contReset').onclick=()=>{if(!confirm('¿Borrar todo el conteo? El número, las sumas, las restas y los nulos regresan a 0.'))return;LS.set(CONT_KEY,{n:0,s:0,r:0,z:0});contPintar(contLeer());toast('Conteo reiniciado.')}}
 document.addEventListener('touchmove',e=>{if(document.body.classList.contains('modo-contador'))e.preventDefault()},{passive:false});
 document.addEventListener('wheel',e=>{if(document.body.classList.contains('modo-contador'))e.preventDefault()},{passive:false});

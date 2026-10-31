@@ -225,8 +225,8 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .sugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.sugs button{text-align:left}
 .contador{text-align:center}
 .cont-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-.cont-zona{position:relative;margin:14px 0 6px;min-height:min(52vh,420px);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;border:2px dashed var(--accent-line);border-radius:18px;background:var(--accent-soft);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
-.cont-num{font-size:clamp(96px,30vw,180px);font-weight:800;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.cont-zona{position:relative;margin:10px 0 6px;min-height:min(34vh,420px);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;border:2px dashed var(--accent-line);border-radius:18px;background:var(--accent-soft);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.cont-num{font-size:clamp(80px,24vw,180px);font-weight:800;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
 .cont-stats{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;font-size:15px}
 .cont-stats .ok{color:var(--ok)}.cont-stats .bad{color:var(--bad)}.cont-stats .nulo{color:var(--muted)}
 .cont-flash{position:fixed;inset:0;z-index:60;opacity:0;pointer-events:none}
@@ -235,7 +235,7 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .cont-flash.nulo{background:#8a939c;animation:contFlash .35s ease-out}
 @keyframes contFlash{from{opacity:.45}to{opacity:0}}
 html.modo-contador,body.modo-contador{overscroll-behavior:none}
-.cont-calc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 4px;text-align:center}.cont-calc>div:not([style]){border:1px solid var(--line);border-radius:12px;padding:10px 6px;background:var(--card)}
+.cont-calc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px;text-align:center}.cont-calc>div:not([style]){border:1px solid var(--line);border-radius:12px;padding:10px 6px;background:var(--card)}
 .cont-calc span{display:block;font-size:12.5px;color:var(--muted)}.cont-calc b{font-size:24px;font-variant-numeric:tabular-nums;color:var(--fg)}.cont-calc .dest{border-color:var(--accent)}.cont-calc .dest b{color:var(--accent)}
 </style>
 </head>
@@ -1668,7 +1668,7 @@ function contCalcHtml(c){const k=contCalc(c);return `<div class="cont-calc" id="
   <div style="grid-column:1/-1"><button class="mini sec peligro" id="cvReset">Reiniciar todos los valores</button></div></div>`}
 function contCalcPintar(c){const b=$('contCalc');if(b)b.outerHTML=contCalcHtml(c);const r=$('cvReset');if(r)r.onclick=()=>{const x=$('contReset');if(x)x.click()}}
 function contLeer(){const d=LS.get(CONT_KEY,null);return d&&typeof d==='object'?{n:Number(d.n)||0,s:Number(d.s)||0,r:Number(d.r)||0,z:Number(d.z)||0}:{n:0,s:0,r:0,z:0}}
-V.contador=()=>{const c=contLeer();return `<div class="card contador"><div class="cont-cab"><h2 style="margin:0">👆 Contador</h2><span class="tag warn">EXPERIMENTO</span></div>
+V.contador=()=>{const c=contLeer();return `<div class="card contador"><div class="cont-cab"><h2 style="margin:0">👆 Contador</h2><span style="display:flex;gap:8px;align-items:center"><span class="tag warn">EXPERIMENTO</span><button class="mini peligro" id="contResetTop">↺ Reiniciar</button></span></div>
   <p class="muted" style="margin:6px 0 0">Desliza hacia arriba para sumar y hacia abajo para restar. Hacia los lados cuenta como nulo.</p>
   <div class="cont-zona" id="contZona"><div class="cont-num" id="contNum">${c.n}</div>
   <div class="cont-stats"><span class="ok">▲ Sumas <b id="contS">${c.s}</b></span><span class="bad">▼ Restas <b id="contR">${c.r}</b></span><span class="nulo">↔ Nulos <b id="contZ">${c.z}</b></span></div></div>${contCalcHtml(c)}
@@ -1680,12 +1680,12 @@ function contMover(dx,dy){if(Math.max(Math.abs(dx),Math.abs(dy))<CONT_MIN)return
   LS.set(CONT_KEY,c);contPintar(c);contFlash(t)}
 function enlazarContador(){const en=vista==='contador';document.documentElement.classList.toggle('modo-contador',en);document.body.classList.toggle('modo-contador',en);
   if(!en){contEntro=false;return}const z=$('contZona');if(!z)return;
-  if(!contEntro){contEntro=true;setTimeout(()=>{const r=z.getBoundingClientRect();if(r.bottom>innerHeight)window.scrollBy(0,r.bottom-innerHeight+12)},0)}
+  if(!contEntro){contEntro=true;setTimeout(()=>{const c=z.closest('.contador');if(c)window.scrollBy(0,c.getBoundingClientRect().top-8)},0)}
   let ini=null;
   z.addEventListener('pointerdown',e=>{ini={x:e.clientX,y:e.clientY,id:e.pointerId};try{z.setPointerCapture(e.pointerId)}catch(er){}});
   z.addEventListener('pointerup',e=>{if(!ini||e.pointerId!==ini.id)return;const dx=e.clientX-ini.x,dy=e.clientY-ini.y;ini=null;contMover(dx,dy)});
   z.addEventListener('pointercancel',()=>{ini=null});
-  {const r=$('cvReset');if(r)r.onclick=()=>$('contReset').click()}
+  {const r=$('cvReset');if(r)r.onclick=()=>$('contReset').click();const t=$('contResetTop');if(t)t.onclick=()=>$('contReset').click()}
   $('contReset').onclick=()=>{if(!confirm('¿Borrar todo el conteo? El número, las sumas, las restas y los nulos regresan a 0.'))return;LS.set(CONT_KEY,{n:0,s:0,r:0,z:0});contPintar(contLeer());toast('Conteo reiniciado.')}}
 document.addEventListener('touchmove',e=>{if(document.body.classList.contains('modo-contador'))e.preventDefault()},{passive:false});
 document.addEventListener('wheel',e=>{if(document.body.classList.contains('modo-contador'))e.preventDefault()},{passive:false});

@@ -365,7 +365,8 @@ const ROL_TXT={'Coordinación':'Coordinación de Producción'};function rolTxt(r
 function misLineas(){const l=perfil&&perfil.linea;if(!l||l==='todas')return null;if(maq(l))return [l];return MAQ_TODAS.filter(m=>m.linea===l).map(m=>m.id)}
 // AM Pack y CIC comparten mecánicos: quien es de una atiende las dos
 const GRUPOS_PLANTA=[['AM Pack','CIC']];
-function plantasDe(pl){return GRUPOS_PLANTA.find(g=>g.includes(pl))||[pl]}
+const TODAS_PLANTAS='Todas las plantas';
+function plantasDe(pl){if(pl===TODAS_PLANTAS)return PLANTAS.slice();return GRUPOS_PLANTA.find(g=>g.includes(pl))||[pl]}
 function deMiLinea(r){const l=misLineas();if(l)return l.includes(r.equipo);const pl=perfil&&perfil.planta,m=maq(r.equipo);if(!m)return false;return !pl||!m.planta||plantasDe(pl).includes(m.planta)}
 function catalogoCambio(){render();try{if(perfil&&insiste()&&misPendientes().length&&$('alarma').hidden)abrirAlarma()}catch(e){}}
 function esMecanico(){return activoP()&&ROLES_MANTTO.includes(perfil.rol)}
@@ -399,13 +400,13 @@ function inicioRol(){const i=INICIO[grupo()]||'cuenta',vp=vistasPermitidas();if(
 function permisosForm(u){if(!esPrincipal()||u.rol===PRINCIPAL)return '';const sel=Array.isArray(u.vistas)?u.vistas:seccionesDefecto(u.rol);
   return `<fieldset class="permisos" id="u_perm" data-tocado="${Array.isArray(u.vistas)?'1':''}"><legend>¿Qué puede ver?</legend><p class="muted" style="margin:0 0 8px">Vienen marcadas según el puesto. Pon o quita palomitas y guarda.</p>
   <div class="permgrid">${SECCIONES.map(([k,t])=>`<label class="chk"><input type="checkbox" name="u_v" value="${k}" ${sel.includes(k)?'checked':''}> ${t}</label>`).join('')}</div>
-  <div class="acciones" style="margin-top:8px"><button type="button" class="mini sec" id="u_permDef">Restablecer según el puesto</button></div>
+  <p class="aviso" id="u_permNota" hidden style="margin:8px 0 0"></p><div class="acciones" style="margin-top:8px"><button type="button" class="mini sec" id="u_permDef">Restablecer según el puesto</button></div>
   <small class="muted">«Mi cuenta» siempre está disponible. «Configuración de red» y «Plantas y máquinas» son solo tuyas.${vistasDefecto(u.rol).includes('usuarios')?' Este puesto también da de alta usuarios.':''}</small></fieldset>`}
 function leerPermisos(rol){const f=$('u_perm');if(!f)return undefined;const v=[...f.querySelectorAll('[name=u_v]:checked')].map(x=>x.value),d=seccionesDefecto(rol);
   return v.length===d.length&&v.every(k=>d.includes(k))?null:v}
 function enlazarPermisos(){const f=$('u_perm');if(!f)return;const marcar=rol=>{const d=seccionesDefecto(rol);f.querySelectorAll('[name=u_v]').forEach(x=>x.checked=d.includes(x.value))};
   f.querySelectorAll('[name=u_v]').forEach(x=>x.addEventListener('change',()=>f.dataset.tocado='1'));
-  const r=$('u_rol');if(r)r.addEventListener('change',()=>{if(!f.dataset.tocado)marcar(r.value)});
+  const r=$('u_rol');if(r)r.addEventListener('change',()=>{marcar(r.value);f.dataset.tocado='';const n=$('u_permNota');if(n){n.hidden=false;n.textContent='Se marcaron las secciones de «'+rolTxt(r.value)+'». Puedes ajustarlas antes de guardar.'}});
   const b=$('u_permDef');if(b)b.onclick=()=>{marcar($('u_rol').value);f.dataset.tocado=''}}
 
 // ===== Reincidencias: la misma máquina vuelve a fallar poco después de una reparación =====
@@ -1034,14 +1035,14 @@ async function confirmarImport(btn){btn.disabled=true;btn.textContent='Cargando�
   toast('📦 '+filas.length+' refacciones cargadas.');importPrev=null;render(true)}catch(e){toast(errTxt(e));btn.disabled=false;btn.textContent='Reintentar'}}
 function siguienteNumero(rol){const r=RANGOS[rol];if(!r)return '';const usados=new Set(USUARIOS.map(u=>Number(u.numEmpleado||u.usuario)));for(let n=r[0]+1;n<=r[1];n++)if(!usados.has(n))return String(n);return ''}
 function nombreLinea(l){if(!l||l==='todas')return 'Todas las líneas';const m=maq(l);if(m)return m.zona;const x=LINEAS_TODAS.find(y=>y.id===l);return x?x.nombre:l}
-function opcionesLineaUsr(pl,sel){const ls=LINEAS.filter(l=>plantasDe(pl).includes(l.planta));return `<option value="todas" ${!sel||sel==='todas'?'selected':''}>Todas las líneas de la planta</option>`+ls.map(l=>`<option value="${esc(l.id)}" ${sel===l.id?'selected':''}>${esc(l.nombre+(l.planta!==pl?' ('+l.planta+')':''))}</option>`).join('')+(sel&&sel!=='todas'&&!ls.some(l=>l.id===sel)?`<option value="${esc(sel)}" selected>${esc(nombreLinea(sel))}</option>`:'')}
+function opcionesLineaUsr(pl,sel){const ls=LINEAS.filter(l=>plantasDe(pl).includes(l.planta));return `<option value="todas" ${!sel||sel==='todas'?'selected':''}>${pl===TODAS_PLANTAS?'Todas las líneas de todas las plantas':'Todas las líneas de la planta'}</option>`+ls.map(l=>`<option value="${esc(l.id)}" ${sel===l.id?'selected':''}>${esc(l.nombre+(l.planta!==pl?' ('+l.planta+')':''))}</option>`).join('')+(sel&&sel!=='todas'&&!ls.some(l=>l.id===sel)?`<option value="${esc(sel)}" selected>${esc(nombreLinea(sel))}</option>`:'')}
 let usrEdit=null, usrAlta=false, usrFiltro='';
 function formUsuario(u){const nuevo=!u;u=u||{rol:'Mecánico',planta:PLANTAS[0],linea:'todas',activo:true};
   return `<form id="fUsr" data-uid="${esc(u.uid||'')}">
   <div class="dos"><div><label for="u_nom">Nombre completo</label><input id="u_nom" required maxlength="80" value="${esc(u.nombre||'')}"></div>
   <div><label for="u_num">Número de empleado (opcional)</label><input id="u_num" maxlength="10" inputmode="numeric" pattern="[0-9]*" value="${esc(u.numEmpleado||(nuevo?siguienteNumero(u.rol):''))}"><small class="muted" id="u_hint"></small></div></div>
   <div class="dos"><div><label for="u_rol">Puesto</label><select id="u_rol">${ROLES_ASIGNABLES.filter(r=>esPrincipal()||r!=='Administrador').map(r=>`<option value="${r}" ${r===u.rol?'selected':''}>${rolTxt(r)}</option>`).join('')}</select></div>
-  <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta">${PLANTAS.concat(u.planta&&!PLANTAS.includes(u.planta)?[u.planta]:[]).map(p=>`<option ${p===u.planta?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
+  <div><label for="u_planta">Planta <small class="muted">(AM Pack y CIC comparten mecánicos)</small></label><select id="u_planta"><option value="${TODAS_PLANTAS}" ${u.planta===TODAS_PLANTAS?'selected':''}>🏭 Todas las plantas</option>${PLANTAS.concat(u.planta&&u.planta!==TODAS_PLANTAS&&!PLANTAS.includes(u.planta)?[u.planta]:[]).map(p=>`<option ${p===u.planta?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
   <div class="dos"><div><label for="u_linea">Línea asignada</label><select id="u_linea">${opcionesLineaUsr(u.planta||PLANTAS[0],u.linea)}</select></div>
   ${esPrincipal()?`<label class="chk" style="grid-column:1/-1;margin-top:6px"><input type="checkbox" id="u_libre" ${u.accesoLibre?'checked':''}> 🌐 Puede entrar desde cualquier red <small class="muted">(aunque no esté en el wifi de la empresa)</small></label>`:''}
   <div><label for="u_act">Estado de la cuenta</label><select id="u_act"><option value="1" ${u.activo?'selected':''}>Activa</option><option value="0" ${!u.activo?'selected':''}>Inactiva</option></select></div></div>

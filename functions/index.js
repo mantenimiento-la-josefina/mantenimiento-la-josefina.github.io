@@ -61,6 +61,7 @@ function leDebeLlegar(perfil, equipo, n, roles, m) {
   if (!roles.includes('Coordinación') && perfil.rol === 'Supervisor de mantenimiento' && n > 1 && (n - 1) % 3 !== 0) return false;
   m = m || {};
   if (perfil.linea && perfil.linea !== 'todas') return perfil.linea === equipo || (!!m.linea && perfil.linea === m.linea);
+  if (perfil.planta === 'Todas las plantas') return true;
   if (perfil.planta && m.planta) return plantasDe(perfil.planta).includes(m.planta);
   return true;
 }

@@ -223,6 +223,8 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .msg{max-width:85%;padding:10px 12px;border-radius:14px;line-height:1.45}.msg.yo{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}.msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
 .msg ol,.msg ul{margin:6px 0;padding-left:20px}.msg .ref{margin-top:8px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}.msg.escribiendo{color:var(--muted);font-style:italic}
 .sugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.sugs button{text-align:left}
+.fcard.apoyo{border-left-color:#2e7d4f;background:#eef8f1}.apoyoest{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:15px}.apoyoest.ok{background:#e3f4e8;color:#1f5e37}.apoyoform{margin-top:8px;padding:10px;border-radius:10px;background:var(--accent-soft)}
+@media (prefers-color-scheme:dark){.fcard.apoyo{background:#1d3327}.apoyoest.ok{background:#1d3327;color:#9fe0b6}}
 </style>
 </head>
 <body>
@@ -502,7 +504,7 @@ function iniciar(){
   const app=fb.apps.length?fb.app():fb.initializeApp(FIREBASE_CONFIG);
   auth=app.auth();db=app.firestore();
   destino=leerDireccion();
-  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};catMaqListo=false;USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
+  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};APOYOS=[];apoyoForm=null;catMaqListo=false;USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
     if(!u){pantallaLogin();return}
     $('app').innerHTML='<div class="card"><p class="muted">Cargando tu cuenta…</p></div>';
     let listo=false,rolAntes=null;
@@ -533,6 +535,7 @@ function suscribir(){
     const eraPrimera=primeraCarga;primeraCarga=false;const oc=ocupado(),libero=estabaOcupado&&!oc;estabaOcupado=oc;if(libero&&insiste()&&misPendientes().length)setTimeout(abrirAlarma,0);pintarBanner();render();if(escaneoPendiente){const em=escaneoPendiente;escaneoPendiente=null;const pr=REG.filter(r=>r.equipo===em&&fallaPendiente(r)).sort((a,b)=>msCreado(a)-msCreado(b))[0];if(pr)TOMANDO.add(pr.id);setTimeout(()=>{if(pr)TOMANDO.delete(pr.id);procesarEscaneo(em)},0)}if(insiste()&&misPendientes().length&&(eraPrimera||abrirAlarma._i))abrirAlarma();else if(abrirAlarma._i&&!misPendientes().length)cerrarAlarma()},err));
   if(verInventario()||puedeRegistrar()){subs.push(db.collection('refacciones').onSnapshot(s=>{REF=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
     if(esAdmin()||grupo()==='direccion'){let q=db.collection('movimientos');try{if(q.orderBy)q=q.orderBy('fecha','desc').limit(80)}catch(e){}subs.push(q.onSnapshot(s=>{MOV=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()},err))}}
+  if(atiende()){apoyosVistos=null;subs.push(db.collection('apoyos').onSnapshot(onApoyos,e=>console.warn(e)))}
   subs.push(db.collection('config').doc('indicadores').onSnapshot(s=>{CFGIND=s.exists?s.data()||{}:{};render()},e=>console.warn(e)));
   {const tu=s=>{TURNOS=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()};if(verTurnos())subs.push(db.collection('turnos').onSnapshot(tu,e=>console.warn(e)));else if(puedeTurno())subs.push(db.collection('turnos').where('operadorUid','==',usuario.uid).onSnapshot(tu,e=>console.warn(e)))}
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
@@ -758,13 +761,44 @@ function selMaq(actual,attr,conTodas){if(MAQUINAS.length<=4)return `<div class="
 document.addEventListener('change',e=>{const t=e.target.closest&&e.target.closest('.selmaqsel');if(!t)return;const v=t.value,a=t.dataset.attr;
   if(a==='ficha'){maqSel=v;ir('ficha');return}if(a==='hist'){maqSel=v;render(true);return}if(a==='ab')filtro.maqAb=v;if(a==='calmaq')calMaq=v;if(a==='indmaq')indMaq=v;render(true)});
 function opcionesMaq(sel,vacio){return (vacio&&!sel?'<option value="" selected disabled>Selecciona la máquina…</option>':'')+opcionesAgrupadas(sel)}
+// ===== Apoyo entre mecánicos: quien atiende una falla pide ayuda a sus compañeros disponibles =====
+let APOYOS=[],apoyoForm=null,apoyosVistos=null;const APOYO_MIN=45;
+function ts2(a){return ms(a.creadoEn)||0}
+function apoyoDe(r){return APOYOS.filter(a=>a.registro===r.id&&['Pendiente','Aceptado'].includes(a.estado)).sort((x,y)=>ts2(y)-ts2(x))[0]||null}
+function apoyosParaMi(){if(!esMecanico()||!usuario||ocupado())return [];return APOYOS.filter(a=>a.estado==='Pendiente'&&a.deUid!==usuario.uid&&!(a.rechazos||[]).includes(usuario.uid)&&Date.now()-ts2(a)<APOYO_MIN*60000&&deMiLinea({equipo:a.equipo})).sort((x,y)=>ts2(x)-ts2(y))}
+function bloqueApoyo(r){if(!atiende())return '';const a=apoyoDe(r);
+  if(!a){if(apoyoForm===r.id)return `<form id="fApoyo" data-id="${esc(r.id)}" class="apoyoform"><label for="ap_nota">¿Para qué necesitas apoyo? <small class="muted">(opcional)</small></label><input id="ap_nota" maxlength="140" placeholder="Ej. Cambiar mordaza, necesito otra mano"><div class="acciones"><button type="submit">🤝 Enviar solicitud</button><button type="button" class="sec" id="apCancelForm">Cancelar</button></div></form>`;
+    return `<div class="acciones" style="margin-top:6px"><button class="sec" data-pedirapoyo="${esc(r.id)}">🤝 Pedir apoyo</button></div>`}
+  if(a.estado==='Aceptado')return `<div class="apoyoest ok">🤝 <b>${esc(a.aceptadoPor||'Un compañero')}</b> va en camino a apoyarte.</div>`;
+  const nr=(a.rechazosNombres||[]).length;return `<div class="apoyoest">🤝 Solicitud de apoyo enviada · esperando respuesta${nr?` · ${nr} no ${nr===1?'puede':'pueden'} (${esc(a.rechazosNombres.join(', '))})`:''} <button class="mini sec" data-cancelapoyo="${esc(a.id)}">Cancelar</button></div>`}
+function tarjetaApoyo(a){const m=maq(a.equipo);return `<div class="fcard apoyo"><h3>🤝 ${esc(a.deNombre)} pide apoyo</h3><p style="margin:0 0 4px"><b>${esc(m?m.nombre+' · '+(m.planta?m.planta+' · ':'')+m.lineaNom:a.equipo)}</b></p>${a.tipoFalla?`<p style="margin:0 0 4px">${esc(a.tipoFalla)}</p>`:''}${a.nota?`<p style="margin:0 0 4px">«${esc(a.nota)}»</p>`:''}<small class="muted">Pidió <span data-desde="${ts2(a)}"></span></small>
+  <div class="acciones"><button data-aceptarapoyo="${esc(a.id)}">✅ Voy a apoyar</button><button class="sec" data-rechazarapoyo="${esc(a.id)}">No puedo ahora</button></div></div>`}
+function seccionApoyos(){const l=apoyosParaMi();return l.length?`<h2>🤝 Te piden apoyo (${l.length})</h2>${l.map(tarjetaApoyo).join('')}`:''}
+function onApoyos(s){APOYOS=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));
+  const mios=new Set(apoyosParaMi().map(a=>a.id));if(apoyosVistos){const nuevos=[...mios].filter(x=>!apoyosVistos.has(x));if(nuevos.length){const a=APOYOS.find(x=>x.id===nuevos[0]);try{sirenaSuave(true)}catch(e){}toast('🤝 '+a.deNombre+' pide apoyo en '+((maq(a.equipo)||{}).zona||'una máquina'));try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}}
+  const ant=apoyosVistos;apoyosVistos=mios;
+  APOYOS.forEach(a=>{if(a.deUid===usuario.uid&&a.estado==='Aceptado'&&!LS.get('ap_ok_'+a.id,false)){LS.set('ap_ok_'+a.id,true);if(ant)toast('🤝 '+a.aceptadoPor+' va a apoyarte.')}});render()}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-pedirapoyo],[data-cancelapoyo],[data-aceptarapoyo],[data-rechazarapoyo],#apCancelForm');if(!b)return;
+  try{if(b.dataset.pedirapoyo){apoyoForm=b.dataset.pedirapoyo;render(true);const i=$('ap_nota');if(i)i.focus();return}
+    if(b.id==='apCancelForm'){apoyoForm=null;render(true);return}
+    b.disabled=true;const FV=fb.firestore.FieldValue;
+    if(b.dataset.cancelapoyo){await db.collection('apoyos').doc(b.dataset.cancelapoyo).update({estado:'Cancelado',cerradoEn:TS()});toast('Solicitud cancelada.');return}
+    if(b.dataset.aceptarapoyo){const a=APOYOS.find(x=>x.id===b.dataset.aceptarapoyo);if(!a||a.estado!=='Pendiente'){toast('Otro compañero ya aceptó.');return}
+      await db.collection('apoyos').doc(a.id).update({estado:'Aceptado',aceptadoUid:usuario.uid,aceptadoPor:perfil.nombre,aceptadoEn:TS()});toast('✅ Avisamos a '+a.deNombre+' que vas en camino.');return}
+    if(b.dataset.rechazarapoyo){await db.collection('apoyos').doc(b.dataset.rechazarapoyo).update({rechazos:FV.arrayUnion(usuario.uid),rechazosNombres:FV.arrayUnion(perfil.nombre)});toast('Listo, le avisamos que no puedes ahora.');return}}
+  catch(er){toast(er&&er.code==='permission-denied'?'Otro compañero ya respondió esta solicitud.':errTxt(er));b.disabled=false}});
+function enlazarApoyo(){const f=$('fApoyo');if(!f)return;f.onsubmit=async ev=>{ev.preventDefault();const r=REG.find(x=>x.id===f.dataset.id);if(!r)return;const bt=f.querySelector('button[type=submit]');bt.disabled=true;
+  try{await db.collection('apoyos').doc().set({registro:r.id,equipo:r.equipo,tipoFalla:r.tipoFalla||'',nota:$('ap_nota').value.trim(),deUid:usuario.uid,deNombre:perfil.nombre,estado:'Pendiente',rechazos:[],rechazosNombres:[],creadoEn:TS()});apoyoForm=null;toast('🤝 Se avisó a tus compañeros disponibles.');render(true)}
+  catch(er){toast(errTxt(er));bt.disabled=false}}}
+async function cerrarApoyoDe(id){const r=REG.find(x=>x.id===id);const a=r&&apoyoDe(r);if(a&&a.deUid===usuario.uid){try{await db.collection('apoyos').doc(a.id).update({estado:'Terminado',cerradoEn:TS()})}catch(e){}}}
+
 function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=en&&r.atendidoUid===usuario.uid;
   return `<div class="fcard ${en?'atencion':''}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(m?m.nombre+' · '+m.lineaNom:r.equipo)}</h3><span class="reloj" data-desde="${en?ms(r.inicioAtencion)||msCreado(r):msCreado(r)}"></span></div>
   <p style="margin:0 0 6px"><b>${esc(r.tipoFalla||'Falla')}</b>${r.severidad==='Paro de línea'?' <span class="tag bad">Línea detenida</span>':''} ${tagEstado(r.estado)}</p>
   <p style="margin:0 0 6px">${esc(r.actividad)}</p>
   <small class="muted">Reportó ${esc(r.tecnico)} a las ${hhmm(msCreado(r))||esc(r.hora)}${en?` · Atiende <b>${esc(r.atendidoPor||'')}</b> desde ${hhmm(ms(r.inicioAtencion))}`:''}</small>
   ${r.fotos&&r.fotos.length?'<div class="acciones" style="margin-top:8px">'+fotosBtn(r.fotos)+'</div>':''}
-  ${opc.acciones&&atiende()?(PENDIENTES.includes(r.estado)?(insiste()?`<div class="acciones"><button class="falla xl" id="abrirEscaner">📷 Escanear QR para atender</button></div><small class="muted">La falla se toma a tu nombre al escanear el código de la máquina.</small>`:`<div class="acciones"><button class="falla xl" data-atender="${esc(r.id)}">Atender falla</button></div>`):mia&&finalizando!==r.id?`<div class="acciones"><button class="xl" data-finalizar="${esc(r.id)}">Finalizar trabajo</button></div>`:''):''}
+  ${opc.acciones&&atiende()?(PENDIENTES.includes(r.estado)?(insiste()?`<div class="acciones"><button class="falla xl" id="abrirEscaner">📷 Escanear QR para atender</button></div><small class="muted">La falla se toma a tu nombre al escanear el código de la máquina.</small>`:`<div class="acciones"><button class="falla xl" data-atender="${esc(r.id)}">Atender falla</button></div>`):mia&&finalizando!==r.id?`<div class="acciones"><button class="xl" data-finalizar="${esc(r.id)}">Finalizar trabajo</button></div>${bloqueApoyo(r)}`:''):''}
   ${mia&&finalizando===r.id?formFinalizar(r):''}</div>`}
 let REF=[],MOV=[],invFiltro='',invEdit=null,invAlta=false,importPrev=null;
 function refOpciones(){return REF.slice().sort((a,b)=>String(a.nombre).localeCompare(b.nombre)).map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}${x.codigo?' · '+esc(x.codigo):''} (hay ${Number(x.existencia)||0} ${esc(x.unidad||'')})</option>`).join('')}
@@ -844,7 +878,7 @@ V.panel=()=>{
 V.alertas=()=>{const pend=REG.filter(fallaPendiente).filter(r=>!esMecanico()||deMiLinea(r)).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
   const mias=aten.filter(r=>r.atendidoUid===usuario.uid),otras=aten.filter(r=>r.atendidoUid!==usuario.uid);
   const hoyCerr=REG.filter(r=>esFalla(r)&&r.estado==='Cerrada'&&r.fechaCierre===hoy()).sort((a,b)=>(ms(b.finAtencion)||0)-(ms(a.finAtencion)||0));
-  return `${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
+  return `${seccionApoyos()}${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
   <h2>Fallas sin atender (${pend.length})</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0">No hay fallas pendientes. Cuando una operadora reporte una, aparecerá aquí al instante con alerta y sonido.</p></div>'}
   ${otras.length?`<h2>En atención por otros mecánicos</h2>${otras.map(r=>tarjetaFalla(r)).join('')}`:''}
   ${(()=>{const pc=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r));return pc.length?`<h2>Reparadas · esperando confirmación (${pc.length})</h2>${pc.map(tarjetaConfirmar).join('')}`:''})()}
@@ -1643,6 +1677,7 @@ function pintarMenuPrincipal(){const n=$('nav');if(!n)return;n.className='menu-p
 
 function pintarPlantasHeader(){const e=$('plantasHeader');if(e)e.textContent='Plantas '+PLANTAS.join(' · ')}
 function enlazar(){
+  enlazarApoyo();
   enlazarEjecutivo();enlazarTurnos();enlazarCatalogo();enlazarRed();enlazarReportes();enlazarAsistente();
   const f=$('form');
   if(f)f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]');b.disabled=true;$('fErr').innerHTML='';
@@ -1673,7 +1708,8 @@ function enlazar(){
   if(fz)fz.onsubmit=async ev=>{ev.preventDefault();const b=fz.querySelector('button[type=submit]');b.disabled=true;b.textContent='Guardando…';$('zErr').innerHTML='';const id=fz.dataset.id,r=REG.find(x=>x.id===id);
     const usadas=leerRefs(fz),fl=faltante(usadas);if(fl){$('zErr').innerHTML=`<p class="error">${esc(fl)}</p>`;b.disabled=false;b.textContent='Guardar y finalizar';return}
     try{const fotos=await subirFotos($('z_fotos'),id);const ini=ms(r&&r.inicioAtencion);
-      await db.collection('registros').doc(id).update({estado:POR_CONFIRMAR,finAtencion:TS(),trabajoRealizado:$('z_trab').value.trim(),causa:$('z_causa').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:textoRefs(usadas,$('z_ref').value.trim()),refaccionesUsadas:usadas,fotosCierre:fotos,minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
+      await db.collection('registros').doc(id).update({estado:POR_CONFIRMAR,finAtencion:TS(),trabajoRealizado:$('z_trab').value.trim(),causa:$('z_causa').value.trim(),ajustes:$('z_aj').value.trim(),refacciones:textoRefs(usadas,$('z_ref').value.trim()),refaccionesUsadas:usadas,fotosCierre:fotos,apoyo:((r&&apoyoDe(r))||{}).aceptadoPor||'',minutos:ini?String(Math.max(1,Math.round((Date.now()-ini)/60000))):''});
+      try{await cerrarApoyoDe(id)}catch(er){}
       try{await descontarRefs(usadas,id,r&&r.equipo)}catch(er){toast('Trabajo guardado, pero no se pudo descontar el inventario: '+errTxt(er))}
       finalizando=null;toast('✅ Trabajo finalizado. La operadora confirmará que la máquina quedó bien.');render(true)}
     catch(e){$('zErr').innerHTML=`<p class="error">${esc(errTxt(e))}</p>`;b.disabled=false;b.textContent='Guardar y finalizar'}};

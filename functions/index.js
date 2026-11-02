@@ -101,7 +101,7 @@ exports.avisarFalla = onDocumentCreated('registros/{id}', async (event) => {
   logger.info('Aviso de falla', event.params.id, out);
 });
 
-async function destinosPara(equipo, n, roles) {
+async function destinosPara(equipo, n, roles, excluir) {
   const tokSnap = await db.collection('tokens').get();
   const porUid = {}, ahora = Date.now(), vencidos = [];
   tokSnap.forEach(d => {
@@ -119,6 +119,7 @@ async function destinosPara(equipo, n, roles) {
     const p = await perfilDe(uid);
     // Quien ya atiende una falla no recibe avisos de otras máquinas (salvo el escalamiento a supervisión)
     if (p && ocupados.has(uid) && !(roles || []).includes('Coordinación')) continue;
+    if (excluir && uid === excluir) continue;
     if (leDebeLlegar(p, equipo, n || 1, roles, m)) destinos.push(...porUid[uid]);
   }
   return destinos;
@@ -300,4 +301,19 @@ exports.verificarRed = onCall(async (req) => {
   const ok = !ips.length || exento || ipCoincide(ip, ips);
   if (ips.length && ok) await db.doc('accesoRed/' + req.auth.uid).set({ ip, hasta: Timestamp.fromMillis(Date.now() + 20 * 60000), en: FieldValue.serverTimestamp() });
   return { ok, ip, requerida: ips.length > 0, exento };
+});
+
+// Apoyo entre mecánicos: aviso (una sola vez) a los compañeros disponibles, y aviso al que pidió cuando alguien acepta
+exports.avisarApoyo = onDocumentCreated('apoyos/{id}', async (event) => {
+  const a = event.data && event.data.data(); if (!a) return;
+  const m = await maqInfo(a.equipo);
+  const out = await enviar(await destinosPara(a.equipo, 1, ['Mecánico'], a.deUid), mensaje('🤝 ' + (a.deNombre || 'Un compañero') + ' pide apoyo', (m.planta ? m.planta + ' · ' : '') + m.zona + (a.nota ? ' — ' + a.nota : (a.tipoFalla ? ' — ' + a.tipoFalla : '')), URL_BASE + '#alertas', 'apoyo-' + event.params.id));
+  logger.info('Apoyo', event.params.id, out);
+});
+exports.respuestaApoyo = onDocumentUpdated('apoyos/{id}', async (event) => {
+  const antes = event.data.before.data(), a = event.data.after.data();
+  if (antes.estado !== 'Pendiente' || a.estado !== 'Aceptado' || !a.deUid) return;
+  const snap = await db.collection('tokens').where('uid', '==', a.deUid).get(), ahora = Date.now();
+  const toks = snap.docs.filter(d => !d.data().expira || Number(d.data().expira) > ahora).map(d => d.id);
+  await enviar(toks, mensaje('🤝 ' + (a.aceptadoPor || 'Un compañero') + ' va a apoyarte', 'Aceptó tu solicitud de apoyo.', URL_BASE + '#alertas', 'apoyo-ok-' + event.params.id));
 });

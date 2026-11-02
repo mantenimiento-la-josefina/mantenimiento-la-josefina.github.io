@@ -70,7 +70,7 @@ service cloud.firestore {
             && resource.data.atendidoUid == request.auth.uid
             && request.resource.data.estado in ['Por confirmar', 'Cerrada']
             && request.resource.data.finAtencion == request.time
-            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos', 'causa']))
+            && cambia(['estado', 'finAtencion', 'fechaCierre', 'trabajoRealizado', 'ajustes', 'refacciones', 'refaccionesUsadas', 'fotosCierre', 'minutos', 'causa', 'apoyo']))
         // Revisión a los 15 minutos: la operadora confirma que la máquina sigue bien o marca reincidencia
         || (activo() && rol() in ['Operador', 'Ingeniero de procesos'] && resource.data.tipo == 'Reporte de falla'
             && resource.data.estado == 'Cerrada'
@@ -154,6 +154,24 @@ service cloud.firestore {
         || (gestor() && request.resource.data.equipo == resource.data.equipo
             && request.resource.data.operadorUid == resource.data.operadorUid
             && request.resource.data.historial.size() == resource.data.get('historial', []).size() + 1);
+      allow delete: if false;
+    }
+
+    // Apoyo entre mecánicos
+    match /apoyos/{id} {
+      allow read: if activo();
+      allow create: if activo() && rol() in ['Mecánico', 'Administrador principal']
+        && request.resource.data.deUid == request.auth.uid
+        && request.resource.data.deNombre == miPerfil().data.nombre
+        && request.resource.data.estado == 'Pendiente'
+        && request.resource.data.creadoEn == request.time;
+      allow update: if activo() && rol() == 'Mecánico' && resource.data.estado == 'Pendiente' && resource.data.deUid != request.auth.uid
+        && ((request.resource.data.estado == 'Aceptado' && request.resource.data.aceptadoUid == request.auth.uid
+             && request.resource.data.aceptadoPor == miPerfil().data.nombre && request.resource.data.aceptadoEn == request.time
+             && cambia(['estado', 'aceptadoUid', 'aceptadoPor', 'aceptadoEn']))
+          || cambia(['rechazos', 'rechazosNombres']));
+      allow update: if activo() && resource.data.deUid == request.auth.uid
+        && request.resource.data.estado in ['Cancelado', 'Terminado'] && cambia(['estado', 'cerradoEn']);
       allow delete: if false;
     }
 

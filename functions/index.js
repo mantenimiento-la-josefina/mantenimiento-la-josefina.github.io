@@ -101,7 +101,7 @@ exports.avisarFalla = onDocumentCreated('registros/{id}', async (event) => {
   logger.info('Aviso de falla', event.params.id, out);
 });
 
-async function destinosPara(equipo, n, roles, excluir) {
+async function destinosPara(equipo, n, roles, excluir, soloUids) {
   const tokSnap = await db.collection('tokens').get();
   const porUid = {}, ahora = Date.now(), vencidos = [];
   tokSnap.forEach(d => {
@@ -120,6 +120,7 @@ async function destinosPara(equipo, n, roles, excluir) {
     // Quien ya atiende una falla no recibe avisos de otras máquinas (salvo el escalamiento a supervisión)
     if (p && ocupados.has(uid) && !(roles || []).includes('Coordinación')) continue;
     if (excluir && uid === excluir) continue;
+    if (soloUids && !soloUids.has(uid)) continue;
     if (leDebeLlegar(p, equipo, n || 1, roles, m)) destinos.push(...porUid[uid]);
   }
   return destinos;
@@ -178,6 +179,14 @@ exports.repetirAvisoFalla = onSchedule({ schedule: 'every 1 minutes', timeZone: 
       }
     }
   } catch (e) { logger.error('Turnos', e); }
+  // Turnos de mecánicos que nadie terminó: se cierran 2 h después de su fin programado
+  try {
+    const tm = await db.collection('turnosMec').where('estado', '==', 'Abierto').get();
+    for (const d of tm.docs) {
+      const t = d.data(), fp = Number(t.finProgramadoMs) || 0;
+      if (fp && ahora > fp + 2 * 3600000) await d.ref.update({ estado: 'Cerrado', fin: Timestamp.fromMillis(fp), cierre: 'Automático: no se terminó' });
+    }
+  } catch (e) { logger.error('Turnos de mecánicos', e); }
 });
 
 // 1c) Falla reabierta por la operadora (❌ sigue fallando) → aviso inmediato a los mecánicos
@@ -307,7 +316,9 @@ exports.verificarRed = onCall(async (req) => {
 exports.avisarApoyo = onDocumentCreated('apoyos/{id}', async (event) => {
   const a = event.data && event.data.data(); if (!a) return;
   const m = await maqInfo(a.equipo);
-  const out = await enviar(await destinosPara(a.equipo, 1, ['Mecánico'], a.deUid), mensaje('🤝 ' + (a.deNombre || 'Un compañero') + ' pide apoyo', (m.planta ? m.planta + ' · ' : '') + m.zona + (a.nota ? ' — ' + a.nota : (a.tipoFalla ? ' — ' + a.tipoFalla : '')), URL_BASE + '#alertas', 'apoyo-' + event.params.id));
+  const tm = await db.collection('turnosMec').where('estado', '==', 'Abierto').get();
+  const enTurno = new Set(tm.docs.map(d => d.data().uid));
+  const out = await enviar(await destinosPara(a.equipo, 1, ['Mecánico'], a.deUid, enTurno), mensaje('🤝 ' + (a.deNombre || 'Un compañero') + ' pide apoyo', (m.planta ? m.planta + ' · ' : '') + m.zona + (a.nota ? ' — ' + a.nota : (a.tipoFalla ? ' — ' + a.tipoFalla : '')), URL_BASE + '#alertas', 'apoyo-' + event.params.id));
   logger.info('Apoyo', event.params.id, out);
 });
 exports.respuestaApoyo = onDocumentUpdated('apoyos/{id}', async (event) => {

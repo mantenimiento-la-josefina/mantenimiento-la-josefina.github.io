@@ -225,6 +225,8 @@ small.mejora{color:var(--ok);font-weight:700}small.empeora{color:var(--bad);font
 .sugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.sugs button{text-align:left}
 .fcard.apoyo{border-left-color:#2e7d4f;background:#eef8f1}.apoyoest{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:15px}.apoyoest.ok{background:#e3f4e8;color:#1f5e37}.apoyoform{margin-top:8px;padding:10px;border-radius:10px;background:var(--accent-soft)}
 @media (prefers-color-scheme:dark){.fcard.apoyo{background:#1d3327}.apoyoest.ok{background:#1d3327;color:#9fe0b6}}
+.turnomec{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;margin-bottom:14px;background:var(--th);border:1px solid var(--line)}.turnomec.on{background:#e3f4e8;border-color:#bfe3cb;color:#1f5e37}
+@media (prefers-color-scheme:dark){.turnomec.on{background:#1d3327;border-color:#2e5a3e;color:#9fe0b6}}
 </style>
 </head>
 <body>
@@ -485,6 +487,7 @@ const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 // ===== Dirección (QR y enlaces) =====
 function leerDireccion(){
   const q=new URLSearchParams(location.search);const h=(location.hash||'').replace('#','');
+  if(q.get('turnomec'))return {vista:'alertas',turnomec:q.get('turnomec')};
   const mid=(maqPorClave(q.get('m'))||{}).id||q.get('equipo'),m=mid?{id:mid}:null;
   if(m)return h==='ficha'?{vista:'ficha',maq:m.id}:{vista:'qr',maq:m.id};
   if(h==='ficha')return {vista:'ficha',maq:'AMP-LA-001'};
@@ -493,7 +496,7 @@ function leerDireccion(){
   return null;
 }
 function escribirDireccion(){
-  try{const conMaq=vista==='falla'&&maqFija?maqFija:vista==='ficha'?maqSel:null;const rel=conMaq?'?m='+maq(conMaq).clave+(vista==='ficha'?'#ficha':''):'#'+vista;
+  try{const conMaq=vista==='falla'&&maqFija?maqFija:vista==='ficha'?maqSel:null;const mq=conMaq&&maq(conMaq),rel=mq?(mq.clave?'?m='+mq.clave:'?equipo='+encodeURIComponent(mq.id))+(vista==='ficha'?'#ficha':''):'#'+vista;
     history.replaceState(null,'',(location.origin+location.pathname===URL_BASE?URL_BASE:'')+rel)}catch(e){}
 }
 
@@ -504,7 +507,7 @@ function iniciar(){
   const app=fb.apps.length?fb.app():fb.initializeApp(FIREBASE_CONFIG);
   auth=app.auth();db=app.firestore();
   destino=leerDireccion();
-  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};APOYOS=[];apoyoForm=null;catMaqListo=false;USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
+  auth.onAuthStateChanged(u=>{usuario=u;cerrarSubs();perfil=null;REG=[];PROG=[];MAQCFG={};APOYOS=[];apoyoForm=null;TURNOSMEC=[];catMaqListo=false;USUARIOS=[];TURNOS=[];CFGIND={};primeraCarga=true;pintarBanner();
     if(!u){pantallaLogin();return}
     $('app').innerHTML='<div class="card"><p class="muted">Cargando tu cuenta…</p></div>';
     let listo=false,rolAntes=null;
@@ -536,6 +539,7 @@ function suscribir(){
   if(verInventario()||puedeRegistrar()){subs.push(db.collection('refacciones').onSnapshot(s=>{REF=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
     if(esAdmin()||grupo()==='direccion'){let q=db.collection('movimientos');try{if(q.orderBy)q=q.orderBy('fecha','desc').limit(80)}catch(e){}subs.push(q.onSnapshot(s=>{MOV=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()},err))}}
   if(atiende()){apoyosVistos=null;subs.push(db.collection('apoyos').onSnapshot(onApoyos,e=>console.warn(e)))}
+  if(atiende()||avisa()){subs.push(db.collection('turnosMec').where('estado','==','Abierto').onSnapshot(s=>{TURNOSMEC=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));const ant=apoyosVistos;if(ant)apoyosVistos=new Set(apoyosParaMi().map(a=>a.id).filter(x=>ant.has(x)));render()},e=>console.warn(e)))}
   subs.push(db.collection('config').doc('indicadores').onSnapshot(s=>{CFGIND=s.exists?s.data()||{}:{};render()},e=>console.warn(e)));
   {const tu=s=>{TURNOS=s.docs.map(d=>Object.assign({},d.data({serverTimestamps:'estimate'}),{id:d.id}));render()};if(verTurnos())subs.push(db.collection('turnos').onSnapshot(tu,e=>console.warn(e)));else if(puedeTurno())subs.push(db.collection('turnos').where('operadorUid','==',usuario.uid).onSnapshot(tu,e=>console.warn(e)))}
   subs.push(db.collection('programa').onSnapshot(s=>{PROG=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));render()},err));
@@ -551,7 +555,7 @@ function entrar(){
   if(destino&&destino.vista==='qr'){const d=destino;destino=null;maqSel=d.maq;
     if(vistasPermitidas().includes('falla')){maqForm=d.maq;maqFija=d.maq;ir('falla',true);return}
     ir('ficha');return}
-  if(destino){if(destino.maq)maqSel=destino.maq;if(vistasPermitidas().includes(destino.vista))v=destino.vista;else if(destino.vista&&destino.vista!=='ficha')toast('No tienes acceso a esa sección.');destino=null}
+  if(destino){if(destino.turnomec){const pid=destino.turnomec;destino.vista=esMecanico()?'alertas':destino.vista;setTimeout(()=>{iniciarTurnoMec(pid).catch(e=>toast(errTxt(e)))},1200)}if(destino.maq)maqSel=destino.maq;if(vistasPermitidas().includes(destino.vista))v=destino.vista;else if(destino.vista&&destino.vista!=='ficha')toast('No tienes acceso a esa sección.');destino=null}
   ir(v);
 }
 function pintarSesion(){
@@ -657,7 +661,7 @@ async function abrirEscaner(){const e=$('escaner');e.hidden=false;
   try{await cargarJsQR();escStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
     const v=$('escVideo');v.srcObject=escStream;await v.play();const c=document.createElement('canvas'),g=c.getContext('2d',{willReadFrequently:true});
     const paso=()=>{if(!escStream)return;if(v.readyState>=2){c.width=v.videoWidth;c.height=v.videoHeight;g.drawImage(v,0,0);const d=g.getImageData(0,0,c.width,c.height);const q=window.jsQR(d.data,c.width,c.height,{inversionAttempts:'dontInvert'});
-      if(q&&q.data){let id=null;try{const u=new URL(q.data);const mm=maqPorClave(u.searchParams.get('m'))||MAQ_TODAS.find(x=>x.id===u.searchParams.get('equipo'));id=mm&&mm.id}catch(er){}
+      if(q&&q.data){let id=null;try{const u0=new URL(q.data);if(u0.searchParams.get('turnomec')){try{navigator.vibrate&&navigator.vibrate(150)}catch(er){}cerrarEscaner();iniciarTurnoMec(u0.searchParams.get('turnomec')).catch(er=>toast(errTxt(er)));return}}catch(er){}try{const u=new URL(q.data);const mm=maqPorClave(u.searchParams.get('m'))||MAQ_TODAS.find(x=>x.id===u.searchParams.get('equipo'));id=mm&&mm.id}catch(er){}
         if(id){try{navigator.vibrate&&navigator.vibrate(150)}catch(er){}cerrarEscaner();procesarEscaneo(id);return}
         $('escMsg').textContent='Ese código no es de una máquina del sistema. Intenta con el QR pegado en la máquina.'}}
       escLoop=requestAnimationFrame(paso)};paso()}
@@ -765,9 +769,9 @@ function opcionesMaq(sel,vacio){return (vacio&&!sel?'<option value="" selected d
 let APOYOS=[],apoyoForm=null,apoyosVistos=null;const APOYO_MIN=45;
 function ts2(a){return ms(a.creadoEn)||0}
 function apoyoDe(r){return APOYOS.filter(a=>a.registro===r.id&&['Pendiente','Aceptado'].includes(a.estado)).sort((x,y)=>ts2(y)-ts2(x))[0]||null}
-function apoyosParaMi(){if(!esMecanico()||!usuario||ocupado())return [];return APOYOS.filter(a=>a.estado==='Pendiente'&&a.deUid!==usuario.uid&&!(a.rechazos||[]).includes(usuario.uid)&&Date.now()-ts2(a)<APOYO_MIN*60000&&deMiLinea({equipo:a.equipo})).sort((x,y)=>ts2(x)-ts2(y))}
+function apoyosParaMi(){if(!esMecanico()||!usuario||ocupado()||!miTurnoMec())return [];return APOYOS.filter(a=>a.estado==='Pendiente'&&a.deUid!==usuario.uid&&!(a.rechazos||[]).includes(usuario.uid)&&Date.now()-ts2(a)<APOYO_MIN*60000&&deMiLinea({equipo:a.equipo})).sort((x,y)=>ts2(x)-ts2(y))}
 function bloqueApoyo(r){if(!atiende())return '';const a=apoyoDe(r);
-  if(!a){if(apoyoForm===r.id)return `<form id="fApoyo" data-id="${esc(r.id)}" class="apoyoform"><label for="ap_nota">¿Para qué necesitas apoyo? <small class="muted">(opcional)</small></label><input id="ap_nota" maxlength="140" placeholder="Ej. Cambiar mordaza, necesito otra mano"><div class="acciones"><button type="submit">🤝 Enviar solicitud</button><button type="button" class="sec" id="apCancelForm">Cancelar</button></div></form>`;
+  if(!a){if(apoyoForm===r.id){const disp=TURNOSMEC.filter(t=>t.estado==='Abierto'&&t.uid!==usuario.uid).length;return `${disp?'':'<p class="aviso" style="margin-top:8px">⚠️ Ahorita ningún compañero está en turno; la solicitud les llegará en cuanto escaneen su QR de entrada.</p>'}<form id="fApoyo" data-id="${esc(r.id)}" class="apoyoform"><label for="ap_nota">¿Para qué necesitas apoyo? <small class="muted">(opcional)</small></label><input id="ap_nota" maxlength="140" placeholder="Ej. Cambiar mordaza, necesito otra mano"><div class="acciones"><button type="submit">🤝 Enviar solicitud</button><button type="button" class="sec" id="apCancelForm">Cancelar</button></div></form>`}
     return `<div class="acciones" style="margin-top:6px"><button class="sec" data-pedirapoyo="${esc(r.id)}">🤝 Pedir apoyo</button></div>`}
   if(a.estado==='Aceptado')return `<div class="apoyoest ok">🤝 <b>${esc(a.aceptadoPor||'Un compañero')}</b> va en camino a apoyarte.</div>`;
   const nr=(a.rechazosNombres||[]).length;return `<div class="apoyoest">🤝 Solicitud de apoyo enviada · esperando respuesta${nr?` · ${nr} no ${nr===1?'puede':'pueden'} (${esc(a.rechazosNombres.join(', '))})`:''} <button class="mini sec" data-cancelapoyo="${esc(a.id)}">Cancelar</button></div>`}
@@ -791,6 +795,30 @@ function enlazarApoyo(){const f=$('fApoyo');if(!f)return;f.onsubmit=async ev=>{e
   try{await db.collection('apoyos').doc().set({registro:r.id,equipo:r.equipo,tipoFalla:r.tipoFalla||'',nota:$('ap_nota').value.trim(),deUid:usuario.uid,deNombre:perfil.nombre,estado:'Pendiente',rechazos:[],rechazosNombres:[],creadoEn:TS()});apoyoForm=null;toast('🤝 Se avisó a tus compañeros disponibles.');render(true)}
   catch(er){toast(errTxt(er));bt.disabled=false}}}
 async function cerrarApoyoDe(id){const r=REG.find(x=>x.id===id);const a=r&&apoyoDe(r);if(a&&a.deUid===usuario.uid){try{await db.collection('apoyos').doc(a.id).update({estado:'Terminado',cerradoEn:TS()})}catch(e){}}}
+
+// ===== Turno de mecánicos: entrada y salida con el QR de mantenimiento de cada planta =====
+let TURNOSMEC=[];
+function miTurnoMec(){return usuario?TURNOSMEC.find(t=>t.uid===usuario.uid&&t.estado==='Abierto'):null}
+function enTurnoMec(uid){return TURNOSMEC.some(t=>t.uid===uid&&t.estado==='Abierto')}
+function urlTurnoMec(pid){return URL_BASE+'?turnomec='+encodeURIComponent(pid)}
+function plantaPorId(pid){return PLANTAS_TODAS.find(p=>p.id===pid)}
+function qrTurnoDataURL(pid){const p=plantaPorId(pid)||{nombre:pid};const q=qrCanvasTexto(urlTurnoMec(pid),512);const out=document.createElement('canvas');out.width=640;out.height=790;const g=out.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,640,790);g.fillStyle='#173f80';g.fillRect(0,0,640,10);if(q)g.drawImage(q,64,58,512,512);g.textAlign='center';
+  g.fillStyle='#173f80';g.font='bold 34px -apple-system,Arial';g.fillText('Entrada y salida de mantenimiento',320,622);g.fillStyle='#1c2833';g.font='bold 28px -apple-system,Arial';g.fillText('Planta '+p.nombre,320,664);
+  g.fillStyle='#55606b';g.font='22px -apple-system,Arial';g.fillText('Mecánicos: escanea al llegar y al irte',320,704);g.fillStyle='#d7262e';g.font='italic bold 22px Georgia,serif';g.fillText('La Josefina · Mantenimiento',320,752);return out.toDataURL('image/png')}
+function imprimirQRTurno(pid){const w=window.open('','_blank');if(!w){toast('Permite ventanas emergentes para imprimir.');return}
+  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>QR de entrada de mantenimiento</title><style>body{margin:0;padding:24px;text-align:center;font-family:Arial}img{width:420px;max-width:90%}</style></head><body><img src="'+qrTurnoDataURL(pid)+'" alt="QR"><script>setTimeout(function(){window.print()},500)<\/script></body></html>');w.document.close()}
+async function iniciarTurnoMec(pid){const p=plantaPorId(pid);if(!p){toast('Ese código no es de una planta registrada.');return}if(!esMecanico()){toast('El QR de entrada es para mecánicos.');return}
+  if(miTurnoMec()){toast('Ya estás en turno desde las '+hhmm(ms(miTurnoMec().inicio))+'.');return}
+  await db.collection('turnosMec').doc().set({uid:usuario.uid,nombre:perfil.nombre,planta:p.nombre,inicio:TS(),finProgramadoMs:Date.now()+HORAS_TURNO*3600000,estado:'Abierto'});try{navigator.vibrate&&navigator.vibrate(150)}catch(e){}toast('🟢 Turno iniciado. Ya puedes recibir solicitudes de apoyo.')}
+async function terminarTurnoMec(){const t=miTurnoMec();if(!t)return;await db.collection('turnosMec').doc(t.id).update({estado:'Cerrado',fin:TS(),cierre:'Mecánico'});toast('⏹ Turno terminado. ¡Buen trabajo!')}
+function bannerTurnoMec(){if(!esMecanico())return '';const t=miTurnoMec();
+  if(t)return `<div class="turnomec on"><div>🟢 <b>En turno</b> desde las ${hhmm(ms(t.inicio))}${t.planta?' · '+esc(t.planta):''}<br><small>Tus compañeros te pueden pedir apoyo.</small></div><button class="mini sec" id="finTurnoMec">Terminar turno</button></div>`;
+  return `<div class="turnomec"><div>⚪ <b>No estás en turno.</b><br><small>Escanea el QR de entrada de mantenimiento al llegar para recibir solicitudes de apoyo.</small></div><button class="mini" id="escTurnoMec">📷 Escanear QR de entrada</button></div>`}
+function listaEnTurno(){if(!(avisa()||esPrincipal()))return '';const l=TURNOSMEC.filter(t=>t.estado==='Abierto').sort((a,b)=>ms(a.inicio)-ms(b.inicio));
+  return `<div class="card"><h2>👷 Mecánicos en turno (${l.length})</h2>${l.length?l.map(t=>{const oc=REG.some(r=>fallaEnAtencion(r)&&r.atendidoUid===t.uid);return `<div class="item"><div><b>${esc(t.nombre)}</b><br><small class="muted">${esc(t.planta||'')} · desde las ${hhmm(ms(t.inicio))}</small></div><span class="tag ${oc?'warn':''}">${oc?'Atendiendo falla':'Disponible'}</span></div>`}).join(''):'<p class="muted">Nadie ha escaneado el QR de entrada.</p>'}</div>`}
+function enlazarTurnoMec(){const e=$('escTurnoMec');if(e)e.onclick=()=>abrirEscaner();const f=$('finTurnoMec');if(f)f.onclick=async()=>{if(!confirm('¿Terminar tu turno? Ya no te llegarán solicitudes de apoyo.'))return;f.disabled=true;try{await terminarTurnoMec()}catch(er){toast(errTxt(er));f.disabled=false}};
+  document.querySelectorAll('[data-qrturno]').forEach(b=>b.onclick=()=>imprimirQRTurno(b.dataset.qrturno))}
 
 function tarjetaFalla(r,opc={}){const m=maq(r.equipo),en=fallaEnAtencion(r),mia=en&&r.atendidoUid===usuario.uid;
   return `<div class="fcard ${en?'atencion':''}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(m?m.nombre+' · '+m.lineaNom:r.equipo)}</h3><span class="reloj" data-desde="${en?ms(r.inicioAtencion)||msCreado(r):msCreado(r)}"></span></div>
@@ -878,10 +906,11 @@ V.panel=()=>{
 V.alertas=()=>{const pend=REG.filter(fallaPendiente).filter(r=>!esMecanico()||deMiLinea(r)).sort((a,b)=>msCreado(a)-msCreado(b)),aten=REG.filter(fallaEnAtencion).sort((a,b)=>msCreado(a)-msCreado(b));
   const mias=aten.filter(r=>r.atendidoUid===usuario.uid),otras=aten.filter(r=>r.atendidoUid!==usuario.uid);
   const hoyCerr=REG.filter(r=>esFalla(r)&&r.estado==='Cerrada'&&r.fechaCierre===hoy()).sort((a,b)=>(ms(b.finAtencion)||0)-(ms(a.finAtencion)||0));
-  return `${seccionApoyos()}${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
+  return `${bannerTurnoMec()}${seccionApoyos()}${mias.length?`<h2>Mis fallas en atención</h2>${mias.map(r=>tarjetaFalla(r,{acciones:true})).join('')}`:''}
   <h2>Fallas sin atender (${pend.length})</h2>${pend.length?pend.map(r=>tarjetaFalla(r,{acciones:true})).join(''):'<div class="card"><p class="muted" style="margin:0">No hay fallas pendientes. Cuando una operadora reporte una, aparecerá aquí al instante con alerta y sonido.</p></div>'}
   ${otras.length?`<h2>En atención por otros mecánicos</h2>${otras.map(r=>tarjetaFalla(r)).join('')}`:''}
   ${(()=>{const pc=REG.filter(r=>fallaPorConfirmar(r)&&deMiLinea(r));return pc.length?`<h2>Reparadas · esperando confirmación (${pc.length})</h2>${pc.map(tarjetaConfirmar).join('')}`:''})()}
+  ${listaEnTurno()}
   <div class="card"><h2>Atendidas hoy (${hoyCerr.length})</h2>${hoyCerr.length?hoyCerr.map(r=>{const t=tiempos(r);return `<div class="item"><div>${tagMaq(r.equipo)} <b>${esc(r.tipoFalla||'Falla')}</b><br><small class="muted">${esc(r.atendidoPor||r.cerradoPor||'')} · respuesta ${durMin(t.resp)} · reparación ${durMin(t.rep)}</small></div>${tagEstado(r.estado)}</div>`}).join(''):'<p class="muted">Ninguna todavía.</p>'}</div>`};
 function estadoTile(id){const ab=REG.filter(r=>r.equipo===id&&esFalla(r)&&abierto(r)).sort((a,b)=>msCreado(a)-msCreado(b));
   const pend=ab.filter(fallaPendiente),aten=ab.filter(fallaEnAtencion);
@@ -1228,7 +1257,7 @@ function lineaSVG(sem){if(sem.length<2)return '<p class="muted">Se necesitan al 
   return `<svg viewBox="0 0 ${W} ${H}" class="lsvg" role="img" aria-label="Evolución semanal de horas de paro y fallas">${sem.map((s,i)=>`<rect x="${x(i)-bw/2}" y="${H-p-(fal[i]/mf)*(H-2*p)*0.6}" width="${bw}" height="${(fal[i]/mf)*(H-2*p)*0.6}" class="barf"><title>${fal[i]} fallas</title></rect>`).join('')}
   <polyline fill="none" class="lin" points="${vals.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" class="pt"><title>${v} h de paro</title></circle><text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" class="tv">${v}</text><text x="${x(i)}" y="${H-12}" text-anchor="middle" class="tx">${fCorta(sem[i].a)}</text>`).join('')}</svg>
   <p class="muted" style="margin:4px 0 0"><span class="ley lin"></span> Horas de paro &nbsp; <span class="ley barf"></span> Número de fallas</p>`}
-function filaSem(nivel,nombre,t,extra){return `<tr class="niv${nivel} s-${t.sem||'nd'}"><td>${nombre}</td><td class="num">${t.nf}</td><td class="num">${t.paros}</td><td class="num">${durN(t.perdido)}${t.enCurso?' <small class="tag bad">en curso</small>':''}</td><td class="num">${durN(prom(t.resp))}</td><td class="num">${pct(t.disp)}</td><td>${pillSem(t.sem)}</td></tr>`}
+function filaSem(nivel,nombre,t,extra){return `<tr class="niv${nivel}"><td>${nombre}</td><td class="num">${t.nf}</td><td class="num">${t.paros}</td><td class="num">${durN(t.perdido)}${t.enCurso?' <small class="tag bad">en curso</small>':''}</td><td class="num">${durN(prom(t.resp))}</td><td class="num">${t.reinc||0}</td></tr>`}
 function opts(l,sel,todos){return `<option value="">${todos}</option>`+l.map(x=>`<option value="${esc(x[0])}" ${x[0]===sel?'selected':''}>${esc(x[1])}</option>`).join('')}
 V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea,maq:EJ.maq};const D=calcular(P.a,P.b,f,now),T=D.t,pv=previo(P),A=pv?calcular(pv.a,pv.b,f,now).t:null;
   const sem=semanasHasta(Math.min(P.b-1,now),8,f,now),mec=mecanicos(D),cau=causas(D),rep=repetitivas(D),top=D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).slice(0,5);
@@ -1242,27 +1271,25 @@ V.ejecutivo=()=>{const P=periodo(),now=Date.now(),f={area:EJ.area,linea:EJ.linea
   <div><label for="ej_lin">Línea</label><select id="ej_lin">${opts(lineasDisp.map(l=>[l,l]),EJ.linea,'Todas las líneas')}</select></div>
   <div><label for="ej_maq">Máquina</label><select id="ej_maq">${opts(maqDisp.map(m=>[m.id,nom(m)]),EJ.maq,'Todas las máquinas')}</select></div></div>
   <div class="acciones"><button id="xlsPer">📥 Excel del periodo</button><button class="sec" id="xls7">📥 Últimos 7 días</button><button class="sec" id="xlsTodo">📥 Historial completo</button></div><div id="xlsMsg"></div></div>
-  ${sinH.length?`<div class="aviso">⚠️ ${sinH.map(x=>esc(x.m.lineaNom+' ('+x.m.area+')')).join(', ')} no tiene${sinH.length>1?'n':''} horario programado, así que su disponibilidad aparece como N/D. ${esAdmin()?'Configúralo en <b>Máquinas → Ficha técnica → Horario programado</b>.':'El Administrador principal o el Supervisor de mantenimiento lo configuran en la ficha de la máquina.'}</div>`:''}
   <div class="grid">${kpiE(durN(T.perdido),'Tiempo total de paro (producción perdida)',delta(T.perdido,A&&A.perdido,true,durMin),T.enCurso?'kbad':'')}
   ${kpiE(T.veces,'Paros reales (veces que se detuvo)',delta(T.veces,A&&A.veces,true,x=>String(x)))}
   ${kpiE(T.nf,'Reportes de falla',delta(T.nf,A&&A.nf,true,x=>String(x)))}
-  ${kpiE(pct(T.disp),'Disponibilidad general',delta(T.disp,A&&A.disp,false,x=>(Math.round(x*1000)/10)+' pts'),T.sem?'k'+T.sem:'')}
   ${kpiE(durN(prom(T.resp)),'Tiempo promedio de respuesta',delta(prom(T.resp),A&&prom(A.resp),true,durMin))}
   ${kpiE(durN(prom(T.rep)),'Tiempo promedio de reparación',delta(prom(T.rep),A&&prom(A.rep),true,durMin))}
   ${kpiE(T.reinc+(T.reparadas?` <small style="font-size:15px">(${pct(pctR(T))})</small>`:''),'🔁 Reincidencias (de las reparaciones)',delta(T.reinc,A&&A.reinc,true,x=>String(x)),T.reinc?'kbad':'')}</div>
-  <div class="card"><h2>Semáforo por área, línea y máquina</h2><p class="muted" style="margin-top:-4px">🟢 pierde menos del ${umbrales().verde}% de sus horas programadas · 🟡 del ${umbrales().verde}% a menos del ${umbrales().rojo}% · 🔴 ${umbrales().rojo}% o más. Meta: disponibilidad mayor a 80%.</p>
-  <div class="scroll"><table class="semtab"><thead><tr><th>Área / línea / máquina</th><th>Reportes</th><th>Paros</th><th>Tiempo perdido</th><th>Resp. prom.</th><th>Disponibilidad</th><th>Semáforo</th></tr></thead><tbody>
+  <div class="card"><h2>Resumen por área, línea y máquina</h2><p class="muted" style="margin-top:-4px">La disponibilidad y el semáforo vienen en el reporte de Excel.</p>
+  <div class="scroll"><table class="semtab"><thead><tr><th>Área / línea / máquina</th><th>Reportes</th><th>Paros</th><th>Tiempo perdido</th><th>Resp. prom.</th><th>🔁 Reincidencias</th></tr></thead><tbody>
   ${D.areas.map(ar=>filaSem(0,'<b>'+esc(ar.area)+'</b>',ar.t)+ar.lineas.map(li=>filaSem(1,esc(li.linea),li.t)+li.maqs.map(x=>filaSem(2,esc(x.m.nombre),x)).join('')).join('')).join('')}
   ${D.areas.length>1?filaSem(0,'<b>Total</b>',T):''}</tbody></table></div></div>
-  <div class="grid2"><div class="card"><h2>Tiempo perdido por área</h2>${hbar(D.areas.map(x=>({l:x.area,v:x.t.perdido,c:x.t.sem})),durMin)}</div>
-  <div class="card"><h2>Tiempo perdido por línea</h2>${hbar([].concat(...D.areas.map(ar=>ar.lineas.map(li=>({l:li.linea+(D.areas.length>1?' · '+ar.area:''),v:li.t.perdido,c:li.t.sem})))),durMin)}</div>
-  <div class="card"><h2>Tiempo perdido por máquina</h2>${hbar(D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).map(x=>({l:x.m.lineaNom+' · '+x.m.nombre,v:x.perdido,c:x.sem})),durMin)}</div>
+  <div class="grid2"><div class="card"><h2>Tiempo perdido por área</h2>${hbar(D.areas.map(x=>({l:x.area,v:x.t.perdido})),durMin)}</div>
+  <div class="card"><h2>Tiempo perdido por línea</h2>${hbar([].concat(...D.areas.map(ar=>ar.lineas.map(li=>({l:li.linea+(D.areas.length>1?' · '+ar.area:''),v:li.t.perdido})))),durMin)}</div>
+  <div class="card"><h2>Tiempo perdido por máquina</h2>${hbar(D.maqs.slice().sort((x,y)=>y.perdido-x.perdido).map(x=>({l:x.m.lineaNom+' · '+x.m.nombre,v:x.perdido})),durMin)}</div>
   <div class="card"><h2>Máquinas con más fallas</h2>${hbar(D.maqs.slice().sort((x,y)=>y.nf-x.nf).map(x=>({l:x.m.lineaNom+' · '+x.m.nombre,v:x.nf})),v=>v+(v===1?' falla':' fallas'))}</div>
   <div class="card"><h2>Principales causas de falla</h2>${hbar(cau.slice(0,8).map(c=>({l:c.tipo,v:c.n})),v=>v+(v===1?' falla':' fallas'))}</div>
   </div><div class="card"><h2>Comparación con el periodo anterior</h2>${A?`<div class="scroll"><table><thead><tr><th></th><th>Anterior</th><th>Actual</th><th>Resultado</th></tr></thead><tbody>
-    ${[['Horas de paro',h1(A.perdido)+' h',h1(T.perdido)+' h',delta(T.perdido,A.perdido,true,durMin)],['Fallas',A.nf,T.nf,delta(T.nf,A.nf,true,String)],['Paros reales',A.veces,T.veces,delta(T.veces,A.veces,true,String)],['Disponibilidad',pct(A.disp),pct(T.disp),delta(T.disp,A.disp,false,x=>(Math.round(x*1000)/10)+' pts')],['Respuesta prom.',durN(prom(A.resp)),durN(prom(T.resp)),delta(prom(T.resp),prom(A.resp),true,durMin)]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num"><b>${r[2]}</b></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">El historial completo no tiene periodo anterior para comparar.</p>'}</div>
+    ${[['Horas de paro',h1(A.perdido)+' h',h1(T.perdido)+' h',delta(T.perdido,A.perdido,true,durMin)],['Fallas',A.nf,T.nf,delta(T.nf,A.nf,true,String)],['Paros reales',A.veces,T.veces,delta(T.veces,A.veces,true,String)],['Respuesta prom.',durN(prom(A.resp)),durN(prom(T.resp)),delta(prom(T.resp),prom(A.resp),true,durMin)]].map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num"><b>${r[2]}</b></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">El historial completo no tiene periodo anterior para comparar.</p>'}</div>
   <div class="card"><h2>Evolución semanal (últimas ${sem.length} semanas)</h2>${lineaSVG(sem)}</div>
-  <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.lineaNom)}</b> <small class="muted">${esc(x.m.area)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s) ${pillSem(x.sem)}</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
+  <div class="grid2"><div class="card"><h2>🔴 Ranking de máquinas críticas</h2>${top.length&&top[0].perdido?`<ol class="rank">${top.filter(x=>x.perdido).map(x=>`<li><b>${esc(x.m.nombre+' · '+x.m.lineaNom)}</b> <small class="muted">${esc(x.m.area)}</small><br>${durMin(x.perdido)} perdidos · ${x.veces} paro(s) · ${x.nf} falla(s)</li>`).join('')}</ol>`:'<p class="muted">Ninguna máquina perdió tiempo por paros en el periodo.</p>'}</div>
   <div class="card"><h2>Intervenciones por mecánico</h2>${mec.length?`<div class="scroll"><table><thead><tr><th>Mecánico</th><th>Intervenciones</th><th>Resp. prom.</th><th>Reparación prom.</th><th>Reincidencias</th></tr></thead><tbody>${mec.map(x=>`<tr${x.reinc?' class="s-amarillo"':''}><td>${esc(x.nombre)}</td><td class="num">${x.n}</td><td class="num">${durN(prom(x.resp))}</td><td class="num">${durN(prom(x.rep))}</td><td class="num">${x.reinc}${x.reparadas?` <small class="muted">(${pct(x.reinc/x.reparadas)})</small>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Sin intervenciones en el periodo.</p>'}</div></div>
   <div class="card"><h2>🔁 Fallas repetitivas</h2>${rep.length?`<div class="scroll"><table><thead><tr><th>Máquina</th><th>Tipo de falla</th><th>Veces</th><th>Tiempo perdido</th><th>Mecánicos</th><th>Refacciones</th></tr></thead><tbody>${rep.map(o=>`<tr class="${o.n>=3?'s-rojo':'s-amarillo'}"><td>${esc(o.m.nombre+' · '+o.m.lineaNom)}</td><td>${esc(o.tipo)}</td><td class="num"><b>${o.n}</b></td><td class="num">${o.perdido?durMin(o.perdido):'0 min'}</td><td>${esc(o.mecTxt)}</td><td><small>${esc(o.refTxt)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No hay fallas que se repitan (mismo tipo en la misma máquina) en el periodo.</p>'}</div>
   <p class="muted"><small>Tiempo de respuesta: del reporte a que el mecánico empieza. Reparación: de que empieza a que termina. Paro: del reporte a que la línea vuelve a producir; si hay reportes al mismo tiempo en una máquina, el tiempo se cuenta una sola vez. Las fallas que no detuvieron la línea cuentan como reportes, pero no como tiempo perdido. N/D = dato no disponible.</small></p>`};
@@ -1490,11 +1517,11 @@ function formCorrTurno(){const t=corrTurno==='nuevo'?null:TURNOS.find(x=>x.id===
   <label for="t_mot">Motivo de la corrección (queda en el historial)</label><input id="t_mot" required maxlength="200" placeholder="Ej. La operadora olvidó finalizar el turno">
   <div class="acciones"><button type="submit">Guardar corrección</button><button type="button" class="sec" id="cancelTurno">Cancelar</button></div><div id="tErr"></div></form>`}
 function formHorario(id){const h=horario(id),dias=h?h.dias.map(Number):[1,2,3,4,5,6],tur=h?h.turnos:[];
-  return `<div class="card"><h2>Horario programado de operación</h2><p class="muted">Con este horario se calculan las horas programadas y la disponibilidad. Los días y turnos que la máquina no trabaja no cuentan en contra.${h?'':' <b>Aún no hay horario guardado:</b> la disponibilidad aparece como N/D.'}</p>
+  return `<div class="card"><h2>Horario programado de operación</h2><p class="muted">Solo se usa para calcular la disponibilidad y el semáforo del <b>reporte de Excel</b>; no se muestra en la plataforma. Los días y turnos que la máquina no trabaja no cuentan en contra.${h?'':' <b>Aún no hay horario guardado:</b> en el Excel la disponibilidad sale como N/D.'}</p>
   <form id="fHor"><label>Días que trabaja</label><div class="opciones">${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" name="h_dia" value="${d}" ${dias.includes(d)?'checked':''}> ${DIAS_TXT[d]}</label>`).join('')}</div>
   <label>Turnos</label>${[0,1,2].map(i=>{const t=tur[i]||TURNOS_SUG[i],on=h?!!tur[i]:i===0;return `<div class="filaTurno"><label class="chk"><input type="checkbox" class="h_on" ${on?'checked':''}> Turno ${i+1}</label><input type="time" class="h_ini" value="${esc(t.inicio)}" aria-label="Inicio turno ${i+1}"><span>a</span><input type="time" class="h_fin" value="${esc(t.fin)}" aria-label="Fin turno ${i+1}"></div>`}).join('')}
   <div class="acciones"><button type="submit">Guardar horario</button></div><div id="hErr"></div></form></div>`}
-function formUmbrales(){const u=umbrales();return `<div class="card"><h2>Semáforo de desempeño (todas las máquinas)</h2><p class="muted">Porcentaje de horas programadas perdidas por paros en el periodo.</p><form id="fUmb" class="dos"><div><label for="u_v">🟢 Verde si pierde menos de (%)</label><input id="u_v" type="number" min="1" max="98" step="0.5" value="${u.verde}"></div><div><label for="u_r">🔴 Rojo desde (%)</label><input id="u_r" type="number" min="2" max="99" step="0.5" value="${u.rojo}"></div><div style="grid-column:1/-1"><small class="muted">Entre ambos valores, 🟡 amarillo. Actual: verde = disponibilidad mayor a ${100-u.verde}%, rojo = ${100-u.rojo}% o menos.</small></div><div><button type="submit">Guardar semáforo</button></div></form></div>`}
+function formUmbrales(){const u=umbrales();return `<div class="card"><h2>Semáforo de desempeño (todas las máquinas)</h2><p class="muted">Para el reporte de Excel: porcentaje de horas programadas perdidas por paros en el periodo.</p><form id="fUmb" class="dos"><div><label for="u_v">🟢 Verde si pierde menos de (%)</label><input id="u_v" type="number" min="1" max="98" step="0.5" value="${u.verde}"></div><div><label for="u_r">🔴 Rojo desde (%)</label><input id="u_r" type="number" min="2" max="99" step="0.5" value="${u.rojo}"></div><div style="grid-column:1/-1"><small class="muted">Entre ambos valores, 🟡 amarillo. Actual: verde = disponibilidad mayor a ${100-u.verde}%, rojo = ${100-u.rojo}% o menos.</small></div><div><button type="submit">Guardar semáforo</button></div></form></div>`}
 function enlazarTurnos(){
   const it=$('iniTurno');if(it)it.onclick=async()=>{it.disabled=true;try{await iniciarTurno(it.dataset.eq);toast('🟢 Turno iniciado.')}catch(e){toast(e.message||errTxt(e));it.disabled=false}};
   const ft=$('finTurno');if(ft)ft.onclick=async()=>{ft.disabled=true;try{await db.collection('turnos').doc(ft.dataset.id).update({estado:'Cerrado',fin:TS(),cierre:'Operadora'});toast('⏹ Turno finalizado. ¡Buen trabajo!')}catch(e){toast(errTxt(e));ft.disabled=false}};
@@ -1545,12 +1572,12 @@ V.catalogo=()=>{const bajasP=PLANTAS_TODAS.filter(p=>p.activo===false),bajasL=LI
   <div class="acciones" style="margin-top:0"><button id="catAddP">+ Agregar planta</button>${nb?`<button class="sec" id="catBajas">${verBajas?'Ocultar':'Ver'} dados de baja (${nb})</button>`:''}</div></div>
   ${catEdit&&catEdit.tipo==='planta'&&!catEdit.id?formCat():''}
   ${PLANTAS_TODAS.filter(p=>p.activo!==false).map(p=>{const ls=LINEAS.filter(l=>l.planta===p.nombre);return `<div class="card catpl"><div class="cathead"><h2>${esc(p.nombre)} <small class="muted">${ls.length} línea${ls.length===1?'':'s'} · ${(n=>n+(n===1?' máquina':' máquinas'))(MAQUINAS.filter(m=>m.planta===p.nombre).length)}</small></h2>
-    <div class="acciones" style="margin:0"><button class="mini sec" data-cat="edit-planta" data-id="${esc(p.id)}">Editar</button><button class="mini peligro" data-cat="baja-planta" data-id="${esc(p.id)}">Dar de baja</button></div></div>
+    <div class="acciones" style="margin:0"><button class="mini sec" data-qrturno="${esc(p.id)}">🖨️ QR de entrada de mecánicos</button><button class="mini sec" data-cat="edit-planta" data-id="${esc(p.id)}">Editar</button><button class="mini peligro" data-cat="baja-planta" data-id="${esc(p.id)}">Dar de baja</button></div></div>
     ${catEdit&&catEdit.tipo==='planta'&&catEdit.id===p.id?formCat():''}
     ${ls.map(l=>{const ms_=MAQUINAS.filter(m=>m.linea===l.id);return `<div class="catlin"><div class="cathead"><h3>${esc(l.nombre)}${l.area&&l.area!==l.planta?` <small class="muted">Área ${esc(l.area)}</small>`:''}</h3>
       <div class="acciones" style="margin:0"><button class="mini sec" data-cat="edit-linea" data-id="${esc(l.id)}">Editar</button><button class="mini peligro" data-cat="baja-linea" data-id="${esc(l.id)}">Dar de baja</button></div></div>
       ${catEdit&&catEdit.tipo==='linea'&&catEdit.id===l.id?formCat():''}
-      ${ms_.length?ms_.map(m=>`<div class="item catmaq"><div><b>${esc(m.nombre)}</b>${m.codigo?` <span class="tag neu">${esc(m.codigo)}</span>`:''}${m.incluye?`<br><small class="muted">Incluye: ${esc(m.incluye)}</small>`:''}${horario(m.id)?'':'<br><small class="muted">⚠️ Sin horario programado</small>'}</div>
+      ${ms_.length?ms_.map(m=>`<div class="item catmaq"><div><b>${esc(m.nombre)}</b>${m.codigo?` <span class="tag neu">${esc(m.codigo)}</span>`:''}${m.incluye?`<br><small class="muted">Incluye: ${esc(m.incluye)}</small>`:''}${horario(m.id)?'':'<br><small class="muted">Sin horario (para la disponibilidad del Excel)</small>'}</div>
         <div class="acciones" style="margin:0"><button class="mini sec" data-ficha="${esc(m.id)}">QR y ficha</button><button class="mini sec" data-cat="edit-maquina" data-id="${esc(m.id)}">Editar</button><button class="mini peligro" data-cat="baja-maquina" data-id="${esc(m.id)}">Dar de baja</button></div></div>${catEdit&&catEdit.tipo==='maquina'&&catEdit.id===m.id?formCat():''}`).join(''):'<p class="muted" style="margin:6px 0">Sin máquinas.</p>'}
       ${catEdit&&catEdit.tipo==='maquina'&&!catEdit.id&&catEdit.padre===l.id?formCat():`<button class="mini" data-cat="add-maquina" data-id="${esc(l.id)}">+ Agregar máquina</button>`}</div>`}).join('')}
     ${catEdit&&catEdit.tipo==='linea'&&!catEdit.id&&catEdit.padre===p.nombre?formCat():`<div class="acciones"><button class="sec" data-cat="add-linea" data-id="${esc(p.nombre)}">+ Agregar línea en ${esc(p.nombre)}</button></div>`}</div>`}).join('')}
@@ -1677,7 +1704,7 @@ function pintarMenuPrincipal(){const n=$('nav');if(!n)return;n.className='menu-p
 
 function pintarPlantasHeader(){const e=$('plantasHeader');if(e)e.textContent='Plantas '+PLANTAS.join(' · ')}
 function enlazar(){
-  enlazarApoyo();
+  enlazarApoyo();enlazarTurnoMec();
   enlazarEjecutivo();enlazarTurnos();enlazarCatalogo();enlazarRed();enlazarReportes();enlazarAsistente();
   const f=$('form');
   if(f)f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]');b.disabled=true;$('fErr').innerHTML='';
@@ -1847,8 +1874,9 @@ async function copiar(t){try{await navigator.clipboard.writeText(t);toast('Enlac
 function urlQR(id){const m=maq(id);return URL_BASE+(m&&m.clave?'?m='+m.clave:'?equipo='+encodeURIComponent(id))}
 // QR con el logo de La Josefina al centro (corrección de errores alta: se sigue leyendo aunque el logo tape una parte)
 const LOGO_QR=new Image();LOGO_QR.src='logo.png';
-function qrCanvas(id,size){size=size||512;const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px;top:0';document.body.appendChild(tmp);
-  try{new QRCode(tmp,{text:urlQR(id),width:size,height:size,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H})}catch(e){tmp.remove();return null}
+function qrCanvas(id,size){return qrCanvasTexto(urlQR(id),size)}
+function qrCanvasTexto(texto,size){size=size||512;const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px;top:0';document.body.appendChild(tmp);
+  try{new QRCode(tmp,{text:texto,width:size,height:size,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H})}catch(e){tmp.remove();return null}
   const src=tmp.querySelector('canvas');const c=document.createElement('canvas');c.width=size;c.height=size;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,size,size);g.imageSmoothingEnabled=false;if(src)g.drawImage(src,0,0,size,size);tmp.remove();
   const bw=Math.round(size*0.36),bh=Math.round(size*0.15),bx=Math.round((size-bw)/2),by=Math.round((size-bh)/2),r=Math.round(size*0.03);
   g.fillStyle='#ffffff';g.beginPath();g.moveTo(bx+r,by);g.arcTo(bx+bw,by,bx+bw,by+bh,r);g.arcTo(bx+bw,by+bh,bx,by+bh,r);g.arcTo(bx,by+bh,bx,by,r);g.arcTo(bx,by,bx+bw,by,r);g.closePath();g.fill();

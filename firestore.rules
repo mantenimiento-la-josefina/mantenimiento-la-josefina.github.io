@@ -175,6 +175,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Turno de mecánicos (entrada y salida con el QR de mantenimiento)
+    match /turnosMec/{id} {
+      allow read: if activo();
+      allow create: if activo() && rol() == 'Mecánico' && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nombre == miPerfil().data.nombre && request.resource.data.estado == 'Abierto'
+        && request.resource.data.inicio == request.time;
+      allow update: if (activo() && resource.data.uid == request.auth.uid && resource.data.estado == 'Abierto'
+            && request.resource.data.estado == 'Cerrado' && request.resource.data.fin == request.time && cambia(['estado', 'fin', 'cierre']))
+        || gestor();
+      allow delete: if false;
+    }
+
     match /programa/{id} {
       allow read: if activo();
       allow write: if gestor();
